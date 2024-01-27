@@ -1,22 +1,25 @@
 import csv
+import os
 import setup_env  # noqa
 from logger_settings import logger
 from kiteconnect import KiteConnect
-import requests
 import config
 from urllib.parse import urlparse, parse_qs
 from typing import Optional
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from time import sleep
-import webbrowser
 from datetime import datetime, timedelta
+from selenium.webdriver.chrome.options import Options
 
 
 class KiteUtil:
     def __init__(self):
         self.kite = KiteConnect(api_key=config.KITE_API_KEY)
-        with webdriver.Chrome() as driver:
+        chrome_options = Options()
+        chrome_options.add_argument('--user-data-dir=./user-data/')
+        # desired_capabilities['sessionName'] = 'MyPersistentSession'  # Replace with a unique name
+        with webdriver.Chrome(options=chrome_options) as driver:
             driver.get(self.kite.login_url())
             while "nitinsuresh.me" not in driver.current_url:
                 sleep(1)
@@ -34,7 +37,13 @@ class KiteUtil:
         return params.get(param_name)[0]
 
     def fetch_stock_data(self, symbol: str, from_date: datetime, to_date: datetime) -> None:
-        data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, "minute")
+        logger.info(f"requesting {symbol}, from: {from_date}, to: {to_date}")
+        try:
+            data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, "minute")
+        except Exception as e:
+            logger.error(e)
+            sleep(1)
+            data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, "minute")
         return data
 
     def fetch_data(self) -> None:
@@ -42,14 +51,16 @@ class KiteUtil:
             current_from_date = datetime.strptime(config.DATE_START, "%Y-%m-%d")
             today = datetime.now()
             while current_from_date < today:
-                data = self.fetch_stock_data(symbol, current_from_date, current_from_date + timedelta(hours=24))
-                if data:
+                file_path = f"data/{symbol}-NSE-{current_from_date.strftime("%Y-%m-%d")}.csv"
+                if not os.path.exists(file_path):
+                    data = self.fetch_stock_data(symbol, current_from_date, current_from_date + timedelta(hours=24))
                     with open(f"data/{symbol}-NSE-{current_from_date.strftime("%Y-%m-%d")}.csv", "w", newline='') as csvfile:
-                        headers = list(data[0].keys())
-                        writer = csv.DictWriter(csvfile, fieldnames=headers)
-                        writer.writeheader()
-                        for row in data:
-                            writer.writerow(row)
+                        if data:
+                            headers = list(data[0].keys())
+                            writer = csv.DictWriter(csvfile, fieldnames=headers)
+                            writer.writeheader()
+                            for row in data:
+                                writer.writerow(row)
                 current_from_date += timedelta(hours=24)
 
 x = KiteUtil()
