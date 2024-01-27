@@ -7,7 +7,6 @@ import config
 from urllib.parse import urlparse, parse_qs
 from typing import Optional
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from time import sleep
 from datetime import datetime, timedelta
 from selenium.webdriver.chrome.options import Options
@@ -51,10 +50,10 @@ class KiteUtil:
             current_from_date = datetime.strptime(config.DATE_START, "%Y-%m-%d")
             today = datetime.now()
             while current_from_date < today:
-                file_path = f"data/{symbol}-NSE-{current_from_date.strftime("%Y-%m-%d")}.csv"
+                file_path = f"data/{symbol}-NSE-{current_from_date.strftime('%Y-%m-%d')}.csv"
                 if not os.path.exists(file_path):
                     data = self.fetch_stock_data(symbol, current_from_date, current_from_date + timedelta(hours=24))
-                    with open(f"data/{symbol}-NSE-{current_from_date.strftime("%Y-%m-%d")}.csv", "w", newline='') as csvfile:
+                    with open(file_path, "w", newline='') as csvfile:
                         if data:
                             headers = list(data[0].keys())
                             writer = csv.DictWriter(csvfile, fieldnames=headers)
@@ -63,5 +62,14 @@ class KiteUtil:
                                 writer.writerow(row)
                 current_from_date += timedelta(hours=24)
 
-x = KiteUtil()
-x.fetch_data()
+
+class DataUtil:
+    @staticmethod
+    def get_intraday_csv_path(symbol: str, date: datetime) -> str:
+        file_path = f"data/{symbol}-NSE-{date.strftime('%Y-%m-%d')}.csv" 
+        if not os.path.exists(file_path):
+            raise Exception("file not found")
+        return file_path
+
+# x = KiteUtil()
+# x.fetch_data()

@@ -6,4 +6,5 @@ scikit-learn
 kiteconnect
 python-dotenv
 selenium
-
+mplfinance
+bokeh
