@@ -45,12 +45,16 @@ class KiteUtil:
             data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, "minute")
         return data
 
+    @staticmethod
+    def get_file_path(symbol: str, date: datetime, exchange: str = "NSE") -> str:
+        return f"data/{symbol}/{date.strftime('%Y-%m-%d')}.csv"
+
     def fetch_data(self) -> None:
         for symbol in config.option_stocks:
             current_from_date = datetime.strptime(config.DATE_START, "%Y-%m-%d")
             today = datetime.now()
             while current_from_date < today:
-                file_path = f"data/{symbol}-NSE-{current_from_date.strftime('%Y-%m-%d')}.csv"
+                file_path = self.get_file_path(symbol, current_from_date)
                 if not os.path.exists(file_path):
                     data = self.fetch_stock_data(symbol, current_from_date, current_from_date + timedelta(hours=24))
                     with open(file_path, "w", newline='') as csvfile:
@@ -63,13 +67,13 @@ class KiteUtil:
                 current_from_date += timedelta(hours=24)
 
 
-class DataUtil:
-    @staticmethod
-    def get_intraday_csv_path(symbol: str, date: datetime) -> str:
-        file_path = f"data/{symbol}-NSE-{date.strftime('%Y-%m-%d')}.csv" 
-        if not os.path.exists(file_path):
-            raise Exception("file not found")
-        return file_path
+#class DataUtil:
+#    @staticmethod
+#    def get_intraday_csv_path(symbol: str, date: datetime) -> str:
+#        file_path = f"data/{symbol}-NSE-{date.strftime('%Y-%m-%d')}.csv" 
+#        if not os.path.exists(file_path):
+#            raise Exception("file not found")
+#        return file_path
 
-# x = KiteUtil()
-# x.fetch_data()
+#x = KiteUtil()
+#x.fetch_data()

@@ -4,7 +4,7 @@ import os
 KITE_API_KEY = os.environ["KITE_API_KEY"]
 KITE_SECRET = os.environ["KITE_SECRET"]
 
-DATE_START = "2020-01-01"
+DATE_START = "2015-01-01"
 
 option_stocks = [
     "AARTIIND",
