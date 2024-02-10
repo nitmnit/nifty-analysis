@@ -8,6 +8,7 @@ __pycache__/
 
 #vim
 *.swo
+*.swp
 
 # Distribution / packaging
 .Python
@@ -162,3 +163,4 @@ user-data/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 data/
+ACCESS_TOKEN
