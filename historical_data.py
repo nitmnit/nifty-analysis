@@ -39,7 +39,7 @@ MAX_PERIOD = {
 
 ALL_INTERVALS = MAX_PERIOD.keys()
 
-lock = threading.Lock()
+#lock = threading.Lock()
 
 
 class KiteUtil:
@@ -99,7 +99,7 @@ class KiteUtil:
             data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, interval)
         except Exception as e:
             logger.error(e)
-            sleep(1)
+            sleep(round(4 * random.random()))
             data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, interval)
         return data
 
@@ -116,6 +116,7 @@ class KiteUtil:
 
     def fetch_bulk_data(self, symbols: List[str], interval) -> None:
         today = datetime.now()
+        removed = 0
         for symbol in symbols:
             current_from_date = datetime.strptime(config.DATE_START, "%Y-%m-%d")
             while current_from_date < today:
@@ -130,7 +131,7 @@ class KiteUtil:
                     if df.shape[0] != 0:
                         df.set_index("date", inplace=True)
                         if interval != INTERVAL_DAY:
-                            while current_from_date < cur_to_date:
+                            while current_from_date < cur_to_date and current_from_date < today:
                                 cur_date_df = df[df.index.date == current_from_date.date()]
                                 file_path = self.get_file_path(symbol, current_from_date.date(), exchange="NSE", interval=interval)
                                 try:
@@ -148,7 +149,7 @@ class KiteUtil:
                                 df.to_csv(file_path)
                             current_from_date = cur_to_date
                     else:
-                        while current_from_date < cur_to_date:
+                        while current_from_date < cur_to_date and current_from_date < today:
                             file_path = self.get_file_path(symbol, current_from_date.date(), exchange="NSE", interval=interval)
                             try:
                                 df.to_csv(file_path)
@@ -158,8 +159,14 @@ class KiteUtil:
                             current_from_date += timedelta(days=1)
                         current_from_date = cur_to_date
                 else:
-                    current_from_date += timedelta(days=1)
-                    #current_from_date = cur_to_date
+                    if current_from_date > today:
+                        os.remove(file_path)
+                        removed += 1
+                        logger.info(f"removed: {removed}")
+                    if interval != INTERVAL_DAY:
+                        current_from_date += timedelta(days=1)
+                    else:
+                        current_from_date = cur_to_date
 
 
 if __name__ == "__main__":
@@ -172,6 +179,7 @@ if __name__ == "__main__":
     nifty_symbols = [symbol for symbol in x.instruments.keys() if symbol.startswith("NIFTY")]
     all_symbols = all_symbols + nifty_symbols
     for interval in ALL_INTERVALS:
+        print(interval)
         while offset < limit:
             stocks = all_symbols[offset : offset+limit//splits]
             thread = threading.Thread(target=x.fetch_bulk_data, args=(stocks, interval))
@@ -180,6 +188,7 @@ if __name__ == "__main__":
             offset += limit//splits
         for thread in threadpool:
             thread.join()
+        offset = 0
     #print(x.instruments.keys())
     #x.fetch_data(INTERVAL_MIN10)
     #x.fetch_nifty_data()
