@@ -3,34 +3,11 @@ import pandas as pd
 import datetime as dt
 import icharts
 from icharts_config import expiries
+from functools import cache
+from constants import *
 
-INTERVAL_MIN1 = "minute"
-INTERVAL_MIN3 = "3minute"
-INTERVAL_MIN5 = "5minute"
-INTERVAL_MIN10 = "10minute"
-INTERVAL_MIN15 = "15minute"
-INTERVAL_MIN30 = "30minute"
-INTERVAL_MIN60 = "60minute"
-INTERVAL_DAY = "day"
 
-MAX_PERIOD = {
-    INTERVAL_MIN1: 60,
-    INTERVAL_MIN3: 100,
-    INTERVAL_MIN5: 100,
-    INTERVAL_MIN10: 100,
-    INTERVAL_MIN15: 200,
-    INTERVAL_MIN30: 200,
-    INTERVAL_MIN60: 400,
-    INTERVAL_DAY: 2000,
-}
-
-ALL_INTERVALS = MAX_PERIOD.keys()
-
-EXCHANGE_NSE = "NSE"
-ALL_EXCHANGES = [
-    EXCHANGE_NSE,
-]
-
+@cache
 def has_data(symbol, candle_timestamp, interval, exchange):
     file_path = KiteUtil.get_file_path(symbol, candle_timestamp, exchange=exchange, interval=interval)
     try:
@@ -40,6 +17,7 @@ def has_data(symbol, candle_timestamp, interval, exchange):
         return False, None
     return df.shape[0] != 0, df
 
+@cache
 def get_last_trading_day(symbol, date, interval, exchange):
     cur_date = date
     data_available = False
@@ -48,11 +26,13 @@ def get_last_trading_day(symbol, date, interval, exchange):
         data_available, _ = has_data(symbol, cur_date, interval=interval, exchange=exchange)
     return cur_date
 
+@cache
 def get_data(symbol, date, interval, exchange):
     file_path = KiteUtil.get_file_path(symbol, date, exchange=exchange, interval=interval)
     _, df = has_data(symbol, date, interval, exchange)
     return df
 
+@cache
 def find_closest_expiry(symbol, date):
     closest_expiry = None
     min_diff = float('inf')
@@ -69,6 +49,7 @@ def get_option_chain_file_path(symbol, expiry, date):
             f"NIFTY_{icharts.convert_date_to_format(expiry)}__"
             f"{icharts.convert_cur_date_to_format(date)}_OptionChain.csv")
 
+@cache
 def get_eod_option_chain(symbol, date):
     file_path = KiteUtil.get_file_path(symbol, date, exchange=exchange, interval=interval)
     _, df = has_data(symbol, date, interval, exchange)

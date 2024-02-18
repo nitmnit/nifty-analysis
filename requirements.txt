@@ -8,4 +8,5 @@ python-dotenv
 selenium
 mplfinance
 bokeh
-git+https://github.com/pyppeteer/pyppeteer.git@dev
+#git+https://github.com/pyppeteer/pyppeteer.git@dev
+dhanhq

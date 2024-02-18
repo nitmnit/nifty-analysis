@@ -14,30 +14,8 @@ from datetime import datetime, timedelta
 from selenium.webdriver.chrome.options import Options
 import pandas as pd
 import threading
+from constants import *
 
-
-INTERVAL_MIN1 = "minute"
-INTERVAL_MIN3 = "3minute"
-INTERVAL_MIN5 = "5minute"
-INTERVAL_MIN10 = "10minute"
-INTERVAL_MIN15 = "15minute"
-INTERVAL_MIN30 = "30minute"
-INTERVAL_MIN60 = "60minute"
-INTERVAL_DAY = "day"
-
-
-MAX_PERIOD = {
-    INTERVAL_MIN1: 60,
-    INTERVAL_MIN3: 100,
-    INTERVAL_MIN5: 100,
-    INTERVAL_MIN10: 100,
-    INTERVAL_MIN15: 200,
-    INTERVAL_MIN30: 200,
-    INTERVAL_MIN60: 400,
-    INTERVAL_DAY: 2000,
-}
-
-ALL_INTERVALS = MAX_PERIOD.keys()
 
 #lock = threading.Lock()
 
@@ -46,16 +24,29 @@ class KiteUtil:
     ACCESS_TOKEN_FILE = "ACCESS_TOKEN"
     BATCH_SIZE_DAYS = 60
 
-    def __init__(self):
+    def __init__(self, exchange=EXCHANGE_NSE):
         self.kite = KiteConnect(api_key=config.KITE_API_KEY)
-        self.set_access_token()
+        self.access_token = self.set_access_token()
         self.instruments = {}
-        self.fetch_instruments()
+        self.instruments_list = self.kite.instruments(exchange)
+        self.exchange = exchange
+        self.fetch_instruments(exchange=exchange)
     
-    def fetch_instruments(self):
-        for instrument in self.kite.instruments('NSE'):
+    def fetch_instruments(self, exchange):
+        for instrument in self.kite.instruments(exchange):
             self.instruments[instrument["tradingsymbol"]] = instrument
-   
+    
+    def get_fo_instrument(self, symbol, expiry, strike_price, option_type):
+        for instrument in self.instruments_list:
+            #print(f'ins nm: {instrument["name"]} ex: {instrument["expiry"]}, seg: {instrument["segment"]}, st: {instrument["strike"]} t: {instrument["instrument_type"]}')
+            if instrument["name"] == symbol and instrument["expiry"] == expiry and instrument["segment"] == "NFO-OPT" and instrument["strike"] == strike_price and instrument["instrument_type"] == f"{option_type}E":
+                return instrument
+
+    def get_nse_instrument_token(self, symbol):
+        for instrument in self.kite.instruments(exchange=EXCHANGE_NSE):
+            if instrument["name"] == symbol:
+                return instrument["instrument_token"]
+
     def fetch_access_token(self):
         chrome_options = Options()
         chrome_options.add_argument('--user-data-dir=./user-data/')
@@ -86,6 +77,7 @@ class KiteUtil:
         with open(self.ACCESS_TOKEN_FILE, 'w') as f:
             f.write(access_token)
         self.kite.set_access_token(access_token)
+        return access_token
 
     def get_params(self, url: str, param_name: str) -> Optional[str | None]:
         parsed_url = urlparse(url)  # Parse the URL
