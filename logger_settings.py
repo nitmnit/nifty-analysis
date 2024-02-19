@@ -1,7 +1,7 @@
 import logging
 
 # Configure logging
-log_format = "%(asctime)s - %(levelname)s - [%(thread)d] - %(message)s"
+log_format = "%(asctime)s - %(levelname)s - [%(thread)d] - \n%(message)s"
 logging.basicConfig(
     level=logging.INFO, format=log_format
 )

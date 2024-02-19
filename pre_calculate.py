@@ -41,32 +41,55 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-INJECT = True
+INJECT = False
 MINIMUM_PREMIUM = 90
-MIN_VOLUME = 1000000000
+MIN_VOLUME = 2 * 10 ** 9 # 1B
+MAX_OC = 10
 IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime("2024-02-22", "%Y-%m-%d")).date()
+#EXPIRY = (dt.datetime.strptime("2024-01-18", "%Y-%m-%d")).date()
 TODAY = dt.datetime.now().date()
+#TODAY = dt.datetime(year=2024, month=1, day=18).date()
+MARKET_OPEN = dt.time(hour=9, minute=15)
+WINDOW_CLOSE = dt.time(hour=15, minute=15, second=10)
 if IS_LIVE is False:
     #TODAY = TODAY - dt.timedelta(days=2)
     pass
 PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
-PREVIOUS_DAY_CLOSE_FILE_NAME = f"PREV_DAY_CL_{PREVIOUS_TRADING_DAY}"
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
 NIFTY_LOWER_SIDE = 500 # Points down from previous close
 NIFTY_UPPER_SIDE = 500 # Points down from previous close
 MIN_GAP = 40 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
-BO_LT = .01 # Bracket order limit price w.r.t. actual open price
+BO_LT = .015 # Bracket order limit price w.r.t. actual open price
 BO_TP = .03 # Target profit percentage w.r.t. buying price
 BO_SL = .03 # SL percentage w.r.t. buying price
 BUY_QUANTITY = 50 # Number of lots as used by dhan
 #BUY_QUANTITY = 1 # Number of lots as used by dhan
 ############  CONSTANTS END #############
+
+
+def get_previous_day_close():
+    global PREVIOUS_TRADING_DAY
+    ku = hd.KiteUtil(exchange=EXCHANGE_NSE)
+    prev_day_candle = False
+    while not prev_day_candle:
+        prev_day_candle = ku.fetch_stock_data(symbol=KITE_SYMBOL, from_date=PREVIOUS_TRADING_DAY, to_date=PREVIOUS_TRADING_DAY, interval=hd.INTERVAL_DAY)
+        if not prev_day_candle:
+            logger.info(f"Changing previous trading day: {PREVIOUS_TRADING_DAY}")
+            PREVIOUS_TRADING_DAY = PREVIOUS_TRADING_DAY - dt.timedelta(days=1)
+    prev_day_close = prev_day_candle[-1]["close"]
+    logger.info(f"Found previous day close: {prev_day_close}")
+    return prev_day_close
+
+
+get_previous_day_close()
+
 logger.info(f"""
 Configuration
 LIVE: {IS_LIVE}
+INJECT: {INJECT}
 EXPIRY: {EXPIRY}
 TODAY: {TODAY}
 PREVIOUS TRADING DAY: {PREVIOUS_TRADING_DAY}
@@ -82,6 +105,7 @@ def prepare_ocdf():
     except FileNotFoundError:
         logger.info("file not found")
         oc = icharts.fetch_option_chain(symbol=IC_SYMBOL, date=PREVIOUS_TRADING_DAY, expiry=EXPIRY)
+        print(oc)
         icharts.save_option_chain_to_file(oc=oc, symbol=IC_SYMBOL, expiry=EXPIRY, date=PREVIOUS_TRADING_DAY)
         ocdf = icharts.get_oc_df(IC_SYMBOL, EXPIRY, PREVIOUS_TRADING_DAY)
 
@@ -120,7 +144,7 @@ def prepare_ocdf():
     ocdf["exchange_token"] = ocdf.apply(lambda r: ku.get_fo_instrument(IC_SYMBOL, r.expiry, r.strike_price, r.option_type)["exchange_token"], axis=1)
     ocdf.set_index("instrument_token", inplace=True)
     ocdf["ltp"] = ocdf.apply(lambda r: ku.fetch_stock_data_it(r.name, PREVIOUS_TRADING_DAY, PREVIOUS_TRADING_DAY, INTERVAL_DAY)[0]["close"], axis=1)
-    logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'theta', 'ltp', 'exchange_token',]
+    logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'theta', 'ltp', 'exchange_token', "volume"]
     #logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'exchange_token', 'latest', 'change']
 ])
     #logger.info(ocdf.shape)
@@ -130,28 +154,6 @@ def prepare_ocdf():
     ocdf.to_pickle(f"prev_day_oc_analysis_trade_date_{TODAY}.pkl")
     # End filtering OC
 
-def get_previous_day_close():
-    global PREVIOUS_TRADING_DAY
-    ku = hd.KiteUtil(exchange=EXCHANGE_NSE)
-    if not IS_LIVE and os.path.exists(PREVIOUS_DAY_CLOSE_FILE_NAME):
-        with open(PREVIOUS_DAY_CLOSE_FILE_NAME, "r") as f:
-            prev_day_close = float(f.read())
-    else:
-        logger.info("prev day close not found")
-        prev_day_candle = False
-        while not prev_day_candle:
-            prev_day_candle = ku.fetch_stock_data(symbol=KITE_SYMBOL, from_date=PREVIOUS_TRADING_DAY, to_date=PREVIOUS_TRADING_DAY, interval=hd.INTERVAL_DAY)
-            if not prev_day_candle:
-                logger.info(f"Changing previous trading day: {PREVIOUS_TRADING_DAY}")
-                PREVIOUS_TRADING_DAY = PREVIOUS_TRADING_DAY - dt.timedelta(days=1)
-        prev_day_close = prev_day_candle[-1]["close"]
-        with open(PREVIOUS_DAY_CLOSE_FILE_NAME, "w+") as f:
-            f.write(f"{prev_day_close}")
-    logger.info(f"Found previous day close: {prev_day_close}")
-    return prev_day_close
-
-
-get_previous_day_close()
 
 def calculate_results():
     results = {}

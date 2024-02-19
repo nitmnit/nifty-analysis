@@ -58,9 +58,9 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
+    lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
     tp = ocdf_frame.ltp + ocdf_frame.ec_pt - ocdf_frame.latest
     tp = pc.convert_float(tp / 2) # Setting half the expectations
-    lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
     #tp = pc.convert_float(lp * pc.BO_TP)
     #sl = pc.convert_float(ocdf_frame.latest * pc.BO_SL)
 
@@ -89,6 +89,10 @@ def place_order(ocdf_frame):
  
 @pc.ct
 def on_ticks(ws, ticks):
+    cur_time = dt.datetime.now().time()
+    if cur_time <= pc.MARKET_OPEN or cur_time > pc.WINDOW_CLOSE:
+        logger.info(f"market not opened yet or window gone: {cur_time}")
+        return
     global NIFTY_OPEN_TODAY, EXECUTED
     if EXECUTED:
         return
@@ -97,11 +101,8 @@ def on_ticks(ws, ticks):
         ticks = pc.modify_ticks_for_testing(ocdf, ticks)
         logger.info(f"modifying ticks after: {ticks}")
     for tick in ticks:
-       #if tick["instrument_token"] == 9146114:
-        #    ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
-        #match = ocdf.loc[tick["instrument_token"], "latest"].iloc[0]
         if tick["instrument_token"] == NIFTY_ITOKEN:
-            if NIFTY_OPEN_TODAY is False and NIFTY_PREV_CLOSE != tick["last_price"]:
+            if NIFTY_OPEN_TODAY is False:
                 cur_time = dt.datetime.now().time()
                 if cur_time > dt.time(hour=9, minute=15):
                     NIFTY_OPEN_TODAY = tick["last_price"]
@@ -109,22 +110,22 @@ def on_ticks(ws, ticks):
             ocdf.loc[tick["instrument_token"], "latest"] = tick["last_price"]
     ocdf["change"] = ocdf.latest - ocdf.ltp
     oc_shape = ocdf.shape[0]
-    conditions_met = EXECUTED = (.5 * ocdf.shape[0]) <= ocdf.loc[ocdf.change != 0.0].shape[0] and NIFTY_OPEN_TODAY is not False
-    if conditions_met:
+    cdm = EXECUTED = NIFTY_OPEN_TODAY is not False and (ocdf.loc[ocdf.change != 0.0].shape[0] > 5)
+    if cdm:
         clear, ocdf_frame = pc.calculate_today_results(ocdf, NIFTY_OPEN_TODAY, NIFTY_PREV_CLOSE)
         if clear and ocdf_frame is not None and ocdf_frame.shape[0] > 0:
             place_order(ocdf_frame)
-            logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
+            logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'volume', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
         logger.info("got all the prices")
         logger.info("disconnect now")
         ws.close()
     else:
         logger.info(f"didn't match all os: {ocdf.shape[0]}, rc: {ocdf.loc[ocdf.change != 0.0].shape[0]} {NIFTY_OPEN_TODAY}")
     logger.info("Ticks: {}".format(json.dumps(ticks)))
-    if conditions_met:
-        logger.info(ocdf)
+    if cdm:
+        logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'volume', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
     else:
-        logger.info(ocdf[['expiry', 'oc_date', 'strike_price', 'ltp', 'option_type', 'exchange_token', 'latest', 'change']])
+        logger.info(ocdf[['expiry', 'oc_date', 'strike_price', 'ltp', 'volume', 'option_type', 'exchange_token', 'latest', 'change']])
 
 def on_connect(ws, response):
     # Callback on successful connect.
