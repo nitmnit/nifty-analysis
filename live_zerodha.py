@@ -1,19 +1,16 @@
 import pre_calculate as pc
+import math
 from historical_data import KiteUtil
 import json
 import config
 import constants as c
 import pandas as pd
 import datetime as dt
-from decimal import Decimal, ROUND_UP
 from dhanhq import dhanhq
-
+from logger_settings import logger
 
 
 pc.prepare_ocdf()
-
-def cm(money):
-    return Decimal(str(money)).quantize(Decimal('0.05'), rounding=ROUND_UP)
 
 ocdf = pd.read_pickle(pc.TODAY_OCDF_PICKLE_FILE_NAME)
 
@@ -30,13 +27,19 @@ ocdf["change"] = 0
 6. Do I need to move to golang or Rust?
 """
 
-import logging
 from kiteconnect import KiteTicker
-
-logging.basicConfig(level=logging.DEBUG)
 
 x = KiteUtil(exchange=c.EXCHANGE_NFO)
 NIFTY_ITOKEN = x.get_nse_instrument_token("NIFTY 50")
+NIFTY_OPEN_TODAY = False
+ORDERED = False
+EXECUTED = False
+
+if pc.IS_LIVE is False:
+    #NIFTY_OPEN_TODAY = float(22020)
+    pass
+NIFTY_PREV_CLOSE = pc.get_previous_day_close()
+assert NIFTY_PREV_CLOSE is not None
 
 # Initialise
 kws = KiteTicker(config.KITE_API_KEY, x.access_token)
@@ -45,53 +48,83 @@ kws = KiteTicker(config.KITE_API_KEY, x.access_token)
 DHAN_CLIENT_ID = ""
 DHAN_ACCESS_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJkaGFuIiwicGFydG5lcklkIjoiIiwiZXhwIjoxNzEwODQyNzAwLCJ0b2tlbkNvbnN1bWVyVHlwZSI6IlNFTEYiLCJ3ZWJob29rVXJsIjoiIiwiZGhhbkNsaWVudElkIjoiMTEwMjI2MTY1MiJ9.exTj4lRdMCuqCt0FtY4Y9r0SqcR41Lj8jIPaTOaIl2ZZ6ABMTa18UTGa9HBYPZ9EOU9xjt8Ud_xQSwxTnCI1AQ"
 dhan = dhanhq(DHAN_CLIENT_ID, DHAN_ACCESS_TOKEN)
-print(dhan.get_fund_limits())
-
-print(ocdf)
+dhan.get_fund_limits()
 tokens = [256265]
 tokens += ocdf.index.to_list()
 
+@pc.ct
 def place_order(ocdf_frame):
-    order_details = {
-        "tag": 'solo', # Done
-        "transaction_type": dhan.BUY, # Done
-        "exchange_segment": dhan.NSE_FNO, # Done
-        "product_type": dhan.BO, # Done
-        "order_type": dhan.LIMIT, # Done
-        "validity": dhan.DAY, # Done
-        "security_id": ocdf_frame.exchange_token, # Done
-        "quantity": pc.BUY_QUANTITY, # ???
-        "disclosed_quantity": math.ceil(pc.BUY_QUANTITY * .31),
-        "price": lp,
-        "bo_profit_value": tp,
-        "bo_stop_loss_Value": sl,
-        "drv_expiry_date": ocdf_frame.expiry,
-        "drv_options_type": ocdf_frame.display_ot,
-        "drv_strike_price": ocdf_frame.name
-    }
-    print(f"IS_LIVE: {IS_LIVE}: Placed order\n {order_details}")
-    if pc.IS_LIVE:
-        dhan.place_order(**order_details)
+    global ORDERED
+    if ORDERED:
+        return
+    ORDERED = True
+    tp = ocdf_frame.ltp + ocdf_frame.ec_pt - ocdf_frame.latest
+    tp = pc.convert_float(tp / 2) # Setting half the expectations
+    lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
+    #tp = pc.convert_float(lp * pc.BO_TP)
+    #sl = pc.convert_float(ocdf_frame.latest * pc.BO_SL)
 
+    order_details = {
+        "security_id": ocdf_frame.exchange_token, # Done
+        "exchange_segment": dhan.NSE_FNO, # Done
+        "transaction_type": dhan.BUY, # Done
+        "quantity": pc.BUY_QUANTITY, # ???
+        "order_type": dhan.LIMIT, # Done
+        "product_type": dhan.BO, # Done
+        "price": lp,
+        "disclosed_quantity": math.ceil(pc.BUY_QUANTITY * .31),
+        "validity": dhan.DAY, # Done
+        "bo_profit_value": tp,
+        "bo_stop_loss_Value": tp,
+        "drv_expiry_date": ocdf_frame.expiry.strftime("%Y-%m-%d"),
+        "drv_options_type": ocdf_frame.display_ot,
+        "drv_strike_price": float(ocdf_frame.strike_price),
+        "tag": 'solo', # Done
+    }
+    if pc.IS_LIVE and pc.INJECT is False:
+        order = dhan.place_order(**order_details)
+        logger.info(f"Placed live order: {order}")
+    logger.info(f"ocdf frame: {ocdf_frame}")
+    logger.info(f"IS_LIVE: {pc.IS_LIVE}, INJECT: {pc.INJECT}: Placed order\n {order_details}")
+ 
+@pc.ct
 def on_ticks(ws, ticks):
-    # Callback to receive ticks.
-    logging.info("Ticks: {}".format(json.dumps(ticks)))
+    global NIFTY_OPEN_TODAY, EXECUTED
+    if EXECUTED:
+        return
+    if pc.INJECT:
+        logger.info(f"modifying ticks before: {ticks}")
+        ticks = pc.modify_ticks_for_testing(ocdf, ticks)
+        logger.info(f"modifying ticks after: {ticks}")
     for tick in ticks:
-        if tick["instrument_token"] == 9146114:
-            ocdf.loc[tick["instrument_token"], "ltp"] = cm(tick["last_price"])
-        if type(ocdf.loc[tick["instrument_token", "latest"]) == type(pd.NA):
-            ocdf.loc[tick["instrument_token"], "latest"] = cm(tick["last_price"])
+       #if tick["instrument_token"] == 9146114:
+        #    ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
+        #match = ocdf.loc[tick["instrument_token"], "latest"].iloc[0]
         if tick["instrument_token"] == NIFTY_ITOKEN:
-            pass
+            if NIFTY_OPEN_TODAY is False and NIFTY_PREV_CLOSE != tick["last_price"]:
+                cur_time = dt.datetime.now().time()
+                if cur_time > dt.time(hour=9, minute=15):
+                    NIFTY_OPEN_TODAY = tick["last_price"]
+        elif type(ocdf.loc[tick["instrument_token"], "latest"]) == type(pd.NA):
+            ocdf.loc[tick["instrument_token"], "latest"] = tick["last_price"]
     ocdf["change"] = ocdf.latest - ocdf.ltp
-    if ocdf.shape[0] == ocdf.loc[ocdf.change != 0].shape[0]:
+    oc_shape = ocdf.shape[0]
+    conditions_met = EXECUTED = (.5 * ocdf.shape[0]) <= ocdf.loc[ocdf.change != 0.0].shape[0] and NIFTY_OPEN_TODAY is not False
+    if conditions_met:
+        clear, ocdf_frame = pc.calculate_today_results(ocdf, NIFTY_OPEN_TODAY, NIFTY_PREV_CLOSE)
+        if clear and ocdf_frame is not None and ocdf_frame.shape[0] > 0:
+            place_order(ocdf_frame)
+            logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
+        logger.info("got all the prices")
+        logger.info("disconnect now")
         ws.close()
-        print("got all the prices")
-        print("disconnect now")
-        print(ocdf)
     else:
-        print("didn't match all")
-        print(ocdf)
+        logger.info(f"didn't match all os: {ocdf.shape[0]}, rc: {ocdf.loc[ocdf.change != 0.0].shape[0]} {NIFTY_OPEN_TODAY}")
+    logger.info("Ticks: {}".format(json.dumps(ticks)))
+    if conditions_met:
+        logger.info(ocdf)
+    else:
+        logger.info(ocdf[['expiry', 'oc_date', 'strike_price', 'ltp', 'option_type', 'exchange_token', 'latest', 'change']])
 
 def on_connect(ws, response):
     # Callback on successful connect.
@@ -100,12 +133,12 @@ def on_connect(ws, response):
 
     # Set RELIANCE to tick in `full` mode.
     ws.set_mode(ws.MODE_LTP, tokens)
-    print("connected")
+    logger.info("connected")
 
 def on_close(ws, code, reason):
     # On connection close stop the main loop
     # Reconnection will not happen after executing `ws.stop()`
-    print(f"closed connection: {reason}")
+    logger.info(f"closed connection: {reason}")
     ws.stop()
 
 # Assign the callbacks.

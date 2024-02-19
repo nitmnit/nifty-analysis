@@ -95,6 +95,16 @@ class KiteUtil:
             data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, interval)
         return data
 
+    def fetch_stock_data_it(self, instrument_token: str, from_date: datetime, to_date: datetime, interval) -> None: # Using instrument token
+        logger.info(f"requesting {instrument_token}, interval: {interval}, from: {from_date}, to: {to_date}")
+        try:
+            data = self.kite.historical_data(instrument_token, from_date, to_date, interval)
+        except Exception as e:
+            logger.error(e)
+            sleep(round(4 * random.random()))
+            data = self.kite.historical_data(instrument_token, from_date, to_date, interval)
+        return data
+
     @staticmethod
     def get_file_path(symbol: str, date: datetime, exchange, interval) -> str:
         if interval != INTERVAL_DAY:
