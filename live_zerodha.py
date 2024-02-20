@@ -94,7 +94,7 @@ def on_ticks(ws, ticks):
         logger.info(f"market not opened yet or window gone: {cur_time}")
         logger.info(f"{json.dumps(ticks)}")
         if cur_time >= pc.WINDOW_CLOSE:
-            exit()
+            exit("Market window closed")
         return
     if EXECUTED:
         return

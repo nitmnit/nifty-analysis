@@ -10,6 +10,7 @@ from logger_settings import logger
 import time
 
 
+logger.info("Start trading")
 ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
 
 def convert_float(num):
