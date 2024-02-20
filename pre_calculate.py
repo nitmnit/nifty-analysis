@@ -41,7 +41,7 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-INJECT = False
+INJECT = True
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * 10 ** 9 # 1B
 MAX_OC = 10
@@ -49,7 +49,7 @@ IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime("2024-02-22", "%Y-%m-%d")).date()
 TODAY = dt.datetime.now().date()
-#TODAY = dt.datetime(year=2024, month=2, day=19).date()
+TODAY = dt.datetime(year=2024, month=2, day=19).date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
 WINDOW_CLOSE = dt.time(hour=9, minute=15, second=30)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
@@ -60,7 +60,7 @@ PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
 NIFTY_LOWER_SIDE = 500 # Points down from previous close
 NIFTY_UPPER_SIDE = 500 # Points down from previous close
-MIN_GAP = 40 # Gap from previous close
+MIN_GAP = 20 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
 BO_LT = .015 # Bracket order limit price w.r.t. actual open price
 EC_PT_RIDE = .6 # How much expectation you are willing to ride
@@ -213,12 +213,14 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
         logger.info(f"Gap not enough today. NO TRADE gap: {prev_day_close - nifty_open}, prev: {prev_day_close}, nifty: {nifty_open}")
     nifty_open_ch = nifty_open - prev_day_close
     nifty_change_pt = nifty_open - prev_day_close
+    selected_option_type = OPTION_TYPE_CALL if nifty_change_pt >= 0 else OPTION_TYPE_PUT
+    ocdf.drop((ocdf.loc[ocdf.option_type != selected_option_type].index), inplace=True)
     ocdf["ec_pt"] = ocdf.apply(lambda r: calculate_expected_premium(r, nifty_change_pt), axis=1) # ec - expected points change in premium
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]
     ocdf["ac_ex_diff"] = ocdf["actual_chg_pc"] - ocdf["ec_pc"]
     ocdf = ocdf.loc[ocdf.ac_ex_diff < 0]
-    ocdf = ocdf.sort_values(by="ac_ex_diff")
+    ocdf.sort_values(by="ac_ex_diff", inplace=True)
     if ocdf.shape[0] > 0:
         return gap_cleared, ocdf.iloc[0]
     else:

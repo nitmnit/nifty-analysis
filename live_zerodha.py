@@ -32,11 +32,12 @@ from kiteconnect import KiteTicker
 x = KiteUtil(exchange=c.EXCHANGE_NFO)
 NIFTY_ITOKEN = x.get_nse_instrument_token("NIFTY 50")
 NIFTY_OPEN_TODAY = False
+IFT = False # Is first tick of the day?
 ORDERED = False
 EXECUTED = False
 
 if pc.INJECT is True:
-    NIFTY_OPEN_TODAY = float(22103.45)
+    #NIFTY_OPEN_TODAY = float(22103.45)
     pass
 NIFTY_PREV_CLOSE = pc.get_previous_day_close()
 assert NIFTY_PREV_CLOSE is not None
@@ -58,7 +59,7 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
-    #lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
+    #lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT)):
     exp = ocdf_frame.ec_pt * .75
     lp = pc.convert_float(ocdf_frame.ltp + (exp * (1 - pc.EC_PT_RIDE)))
     tp = ocdf_frame.ltp + exp - ocdf_frame.latest
@@ -91,10 +92,11 @@ def place_order(ocdf_frame):
  
 @pc.ct
 def on_ticks(ws, ticks):
-    global NIFTY_OPEN_TODAY, EXECUTED
+    global NIFTY_OPEN_TODAY, EXECUTED, IFT
     cur_time = dt.datetime.now().time()
     if not pc.INJECT and (cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE):
         logger.info(f"market not opened yet or window gone: {cur_time}")
+        logger.info(f"{ticks}")
         return
     if EXECUTED:
         return
@@ -103,19 +105,25 @@ def on_ticks(ws, ticks):
         ticks = pc.modify_ticks_for_testing(ocdf, ticks)
         logger.info(f"modifying ticks after: {ticks}")
     for tick in ticks:
-        if tick["instrument_token"] == NIFTY_ITOKEN:
-            if NIFTY_OPEN_TODAY is False:
-                cur_time = dt.datetime.now().time()
-                if cur_time > dt.time(hour=9, minute=15):
-                    logger.info("================================================")
-                    logger.info(f"Found NIFTY_OPEN: {NIFTY_OPEN_TODAY}")
-                    logger.info("================================================")
-                    NIFTY_OPEN_TODAY = tick["last_price"]
-        elif type(ocdf.loc[tick["instrument_token"], "latest"]) == type(pd.NA):
-            ocdf.loc[tick["instrument_token"], "latest"] = tick["last_price"]
+        if IFT:
+            if tick["instrument_token"] != NIFTY_ITOKEN:
+                ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
+                logger.info("Set the last trading price for option chain")
+            else:
+                NIFTY_OPEN_TODAY = tick["last_price"]
+                logger.info("================================================")
+                logger.info(f"Found NIFTY_OPEN: {NIFTY_OPEN_TODAY}")
+                logger.info("================================================")
+        else:
+            if tick["instrument_token"] != NIFTY_ITOKEN:
+                ocdf.loc[tick["instrument_token"], "latest"] = tick["last_price"]
+            else:
+                NIFTY_OPEN_TODAY = tick["last_price"]
+    if IFT:
+        IFT = False
     ocdf["change"] = ocdf.latest - ocdf.ltp
     oc_shape = ocdf.shape[0]
-    cdm = EXECUTED = NIFTY_OPEN_TODAY is not False and (ocdf.loc[ocdf.change != 0.0].shape[0] > 5)
+    cdm = EXECUTED = NIFTY_OPEN_TODAY is not False and (ocdf.loc[(ocdf.change != 0.0) & (ocdf.change.notna())].shape[0] > 5)
     if cdm:
         clear, ocdf_frame = pc.calculate_today_results(ocdf, NIFTY_OPEN_TODAY, NIFTY_PREV_CLOSE)
         if clear and ocdf_frame is not None and ocdf_frame.shape[0] > 0:
