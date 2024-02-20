@@ -43,7 +43,6 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-IS_LIVE = False
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * 10 ** 9 # 1B
 MAX_OC = 10

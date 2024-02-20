@@ -1,6 +1,5 @@
 import pre_calculate as pc
 import math
-from historical_data import KiteUtil
 import json
 import config
 import constants as c
@@ -8,6 +7,7 @@ import pandas as pd
 import datetime as dt
 from dhanhq import dhanhq
 from logger_settings import logger
+from kiteconnect import KiteTicker
 
 
 pc.prepare_ocdf()
@@ -27,9 +27,6 @@ ocdf["change"] = 0
 6. Do I need to move to golang or Rust?
 """
 
-from kiteconnect import KiteTicker
-
-x = KiteUtil(exchange=c.EXCHANGE_NFO)
 NIFTY_OPEN_TODAY = False
 IFT = True # Is first tick of the day?
 ORDERED = False
@@ -42,7 +39,7 @@ NIFTY_PREV_CLOSE = pc.get_previous_day_close()
 assert NIFTY_PREV_CLOSE is not None
 
 # Initialise
-kws = KiteTicker(config.KITE_API_KEY, x.access_token)
+kws = KiteTicker(config.KITE_API_KEY, pc.ku.access_token)
 
 # Dhan
 DHAN_CLIENT_ID = ""
@@ -111,7 +108,6 @@ def on_ticks(ws, ticks):
         if IFT:
             if tick["instrument_token"] != pc.NIFTY_ITOKEN:
                 ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
-                logger.info("Set the last trading price for option chain")
             else:
                 NIFTY_OPEN_TODAY = tick["last_price"]
                 logger.info("================================================")
