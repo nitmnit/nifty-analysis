@@ -10,6 +10,8 @@ from logger_settings import logger
 import time
 
 
+ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
+
 def convert_float(num):
     num = round(num, 2)  # Ensure the number has 2 decimal places
     integer_part = int(num)
@@ -41,7 +43,7 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-INJECT = True
+IS_LIVE = False
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * 10 ** 9 # 1B
 MAX_OC = 10
@@ -67,15 +69,16 @@ EC_PT_RIDE = .6 # How much expectation you are willing to ride
 BO_TP = .03 # Target profit percentage w.r.t. buying price
 BO_SL = .03 # SL percentage w.r.t. buying price
 BUY_QUANTITY = 50 # Number of lots as used by dhan
+NIFTY_ITOKEN = ku.get_nse_instrument_token("NIFTY 50")
 ############  CONSTANTS END #############
 
 
 def get_previous_day_close():
     global PREVIOUS_TRADING_DAY
-    ku = hd.KiteUtil(exchange=EXCHANGE_NSE)
     prev_day_candle = False
+    x = hd.KiteUtil(exchange=EXCHANGE_NSE)
     while not prev_day_candle:
-        prev_day_candle = ku.fetch_stock_data(symbol=KITE_SYMBOL, from_date=PREVIOUS_TRADING_DAY, to_date=PREVIOUS_TRADING_DAY, interval=hd.INTERVAL_DAY)
+        prev_day_candle = x.fetch_stock_data(symbol=KITE_SYMBOL, from_date=PREVIOUS_TRADING_DAY, to_date=PREVIOUS_TRADING_DAY, interval=hd.INTERVAL_DAY)
         if not prev_day_candle:
             logger.info(f"Changing previous trading day: {PREVIOUS_TRADING_DAY}")
             PREVIOUS_TRADING_DAY = PREVIOUS_TRADING_DAY - dt.timedelta(days=1)
@@ -89,7 +92,6 @@ get_previous_day_close()
 logger.info(f"""
 Configuration
 LIVE: {IS_LIVE}
-INJECT: {INJECT}
 EXPIRY: {EXPIRY}
 TODAY: {TODAY}
 PREVIOUS TRADING DAY: {PREVIOUS_TRADING_DAY}
@@ -99,7 +101,6 @@ NIFTY_UPPER_SIDE: {NIFTY_UPPER_SIDE}
 
 
 def prepare_ocdf():
-    ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
     try:
         ocdf = icharts.get_oc_df(IC_SYMBOL, EXPIRY, PREVIOUS_TRADING_DAY)
     except FileNotFoundError:
@@ -215,11 +216,11 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     nifty_change_pt = nifty_open - prev_day_close
     selected_option_type = OPTION_TYPE_CALL if nifty_change_pt >= 0 else OPTION_TYPE_PUT
     ocdf.drop((ocdf.loc[ocdf.option_type != selected_option_type].index), inplace=True)
-    ocdf["ec_pt"] = ocdf.apply(lambda r: calculate_expected_premium(r, nifty_change_pt), axis=1) # ec - expected points change in premium
+    ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]
     ocdf["ac_ex_diff"] = ocdf["actual_chg_pc"] - ocdf["ec_pc"]
-    ocdf = ocdf.loc[ocdf.ac_ex_diff < 0]
+    ocdf.drop(ocdf.loc[(ocdf.ac_ex_diff > 0) & ocdf.ac_ex_diff.isna()].index, inplace=True)
     ocdf.sort_values(by="ac_ex_diff", inplace=True)
     if ocdf.shape[0] > 0:
         return gap_cleared, ocdf.iloc[0]
@@ -228,10 +229,23 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
         return False, None
 
 def modify_ticks_for_testing(ocdf, ticks):
-    ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
-    if INJECT is not True:
-        exit("Inject is False")
+    if IS_LIVE is not False:
+        exit("IS_LIVE is True")
     for tick in ticks:
         ltp = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
         tick["last_price"] = ltp
     return ticks
+
+
+def modify_ticks_for_testing_ift(ocdf, ticks):
+    if IS_LIVE is not False:
+        exit("IS_LIVE is True")
+    for tick in ticks:
+        if tick["instrument_token"] != NIFTY_ITOKEN: 
+            ltp = ku.fetch_stock_data_it(tick["instrument_token"], PREVIOUS_TRADING_DAY, PREVIOUS_TRADING_DAY, INTERVAL_DAY)[0]["close"]
+            tick["last_price"] = ltp
+        else:
+            ltp = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
+            tick["last_price"] = ltp
+    return ticks
+

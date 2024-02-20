@@ -30,13 +30,12 @@ ocdf["change"] = 0
 from kiteconnect import KiteTicker
 
 x = KiteUtil(exchange=c.EXCHANGE_NFO)
-NIFTY_ITOKEN = x.get_nse_instrument_token("NIFTY 50")
 NIFTY_OPEN_TODAY = False
-IFT = False # Is first tick of the day?
+IFT = True # Is first tick of the day?
 ORDERED = False
 EXECUTED = False
 
-if pc.INJECT is True:
+if pc.IS_LIVE is False:
     #NIFTY_OPEN_TODAY = float(22103.45)
     pass
 NIFTY_PREV_CLOSE = pc.get_previous_day_close()
@@ -59,7 +58,7 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
-    #lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT)):
+    #lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
     exp = ocdf_frame.ec_pt * .75
     lp = pc.convert_float(ocdf_frame.ltp + (exp * (1 - pc.EC_PT_RIDE)))
     tp = ocdf_frame.ltp + exp - ocdf_frame.latest
@@ -84,29 +83,33 @@ def place_order(ocdf_frame):
         "drv_strike_price": float(ocdf_frame.strike_price),
         "tag": 'solo', # Done
     }
-    if pc.IS_LIVE and pc.INJECT is False:
+    if pc.IS_LIVE:
         order = dhan.place_order(**order_details)
         logger.info(f"Placed live order: {order}")
     logger.info(f"ocdf frame: {ocdf_frame}")
-    logger.info(f"IS_LIVE: {pc.IS_LIVE}, INJECT: {pc.INJECT}: Placed order\n {order_details}")
+    logger.info(f"IS_LIVE: {pc.IS_LIVE}, Placed order\n {order_details}")
  
 @pc.ct
 def on_ticks(ws, ticks):
     global NIFTY_OPEN_TODAY, EXECUTED, IFT
     cur_time = dt.datetime.now().time()
-    if not pc.INJECT and (cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE):
+    if pc.IS_LIVE and (cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE):
         logger.info(f"market not opened yet or window gone: {cur_time}")
-        logger.info(f"{ticks}")
+        logger.info(f"{json.dumps(ticks)}")
         return
     if EXECUTED:
         return
-    if pc.INJECT:
-        logger.info(f"modifying ticks before: {ticks}")
-        ticks = pc.modify_ticks_for_testing(ocdf, ticks)
-        logger.info(f"modifying ticks after: {ticks}")
+    if pc.IS_LIVE is False:
+        logger.info(f"modifying ticks(ift: {IFT}) before: {ticks}")
+        if IFT:
+            ticks = pc.modify_ticks_for_testing_ift(ocdf, ticks)
+        else:
+            ticks = pc.modify_ticks_for_testing(ocdf, ticks)
+        logger.info(f"modifying ticks(ift: {IFT}) after: {ticks}")
+    price_found = 0
     for tick in ticks:
         if IFT:
-            if tick["instrument_token"] != NIFTY_ITOKEN:
+            if tick["instrument_token"] != pc.NIFTY_ITOKEN:
                 ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
                 logger.info("Set the last trading price for option chain")
             else:
@@ -115,30 +118,27 @@ def on_ticks(ws, ticks):
                 logger.info(f"Found NIFTY_OPEN: {NIFTY_OPEN_TODAY}")
                 logger.info("================================================")
         else:
-            if tick["instrument_token"] != NIFTY_ITOKEN:
+            if tick["instrument_token"] != pc.NIFTY_ITOKEN:
                 ocdf.loc[tick["instrument_token"], "latest"] = tick["last_price"]
+                price_found += 1
             else:
                 NIFTY_OPEN_TODAY = tick["last_price"]
-    if IFT:
-        IFT = False
+    IFT = False
     ocdf["change"] = ocdf.latest - ocdf.ltp
     oc_shape = ocdf.shape[0]
-    cdm = EXECUTED = NIFTY_OPEN_TODAY is not False and (ocdf.loc[(ocdf.change != 0.0) & (ocdf.change.notna())].shape[0] > 5)
+    cdm = EXECUTED = NIFTY_OPEN_TODAY is not False and price_found >= 5
     if cdm:
         clear, ocdf_frame = pc.calculate_today_results(ocdf, NIFTY_OPEN_TODAY, NIFTY_PREV_CLOSE)
         if clear and ocdf_frame is not None and ocdf_frame.shape[0] > 0:
             place_order(ocdf_frame)
             logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'volume', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
-        logger.info("got all the prices")
         logger.info("disconnect now")
         ws.close()
-    else:
-        logger.info(f"didn't match all os: {ocdf.shape[0]}, rc: {ocdf.loc[ocdf.change != 0.0].shape[0]} {NIFTY_OPEN_TODAY}")
-    logger.info("Ticks: {}".format(json.dumps(ticks)))
-    if cdm:
         logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'volume', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
     else:
+        logger.info(f"didn't match all os: {ocdf.shape[0]}, rc: {ocdf.loc[ocdf.change != 0.0].shape[0]} {NIFTY_OPEN_TODAY}")
         logger.info(ocdf[['expiry', 'oc_date', 'strike_price', 'ltp', 'volume', 'option_type', 'exchange_token', 'latest', 'change']])
+    logger.info(f"{json.dumps(ticks)}")
 
 def on_connect(ws, response):
     # Callback on successful connect.
