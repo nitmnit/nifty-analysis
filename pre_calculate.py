@@ -41,18 +41,17 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-INJECT = True
+INJECT = False
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * 10 ** 9 # 1B
 MAX_OC = 10
 IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime("2024-02-22", "%Y-%m-%d")).date()
-#EXPIRY = (dt.datetime.strptime("2024-01-18", "%Y-%m-%d")).date()
 TODAY = dt.datetime.now().date()
-#TODAY = dt.datetime(year=2024, month=1, day=18).date()
+#TODAY = dt.datetime(year=2024, month=2, day=19).date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
-WINDOW_CLOSE = dt.time(hour=15, minute=15, second=10)
+WINDOW_CLOSE = dt.time(hour=9, minute=15, second=30)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
 if IS_LIVE is False:
     #TODAY = TODAY - dt.timedelta(days=2)
@@ -64,10 +63,10 @@ NIFTY_UPPER_SIDE = 500 # Points down from previous close
 MIN_GAP = 40 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
 BO_LT = .015 # Bracket order limit price w.r.t. actual open price
+EC_PT_RIDE = .6 # How much expectation you are willing to ride
 BO_TP = .03 # Target profit percentage w.r.t. buying price
 BO_SL = .03 # SL percentage w.r.t. buying price
 BUY_QUANTITY = 50 # Number of lots as used by dhan
-#BUY_QUANTITY = 1 # Number of lots as used by dhan
 ############  CONSTANTS END #############
 
 

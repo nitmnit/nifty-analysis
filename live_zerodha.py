@@ -58,8 +58,10 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
-    lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
-    tp = ocdf_frame.ltp + ocdf_frame.ec_pt - ocdf_frame.latest
+    #lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
+    exp = ocdf_frame.ec_pt * .75
+    lp = pc.convert_float(ocdf_frame.ltp + (exp * (1 - pc.EC_PT_RIDE)))
+    tp = ocdf_frame.ltp + exp - ocdf_frame.latest
     tp = pc.convert_float(tp / 2) # Setting half the expectations
     #tp = pc.convert_float(lp * pc.BO_TP)
     #sl = pc.convert_float(ocdf_frame.latest * pc.BO_SL)
@@ -89,11 +91,11 @@ def place_order(ocdf_frame):
  
 @pc.ct
 def on_ticks(ws, ticks):
+    global NIFTY_OPEN_TODAY, EXECUTED
     cur_time = dt.datetime.now().time()
-    if cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE:
+    if not pc.INJECT and (cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE):
         logger.info(f"market not opened yet or window gone: {cur_time}")
         return
-    global NIFTY_OPEN_TODAY, EXECUTED
     if EXECUTED:
         return
     if pc.INJECT:
@@ -105,6 +107,9 @@ def on_ticks(ws, ticks):
             if NIFTY_OPEN_TODAY is False:
                 cur_time = dt.datetime.now().time()
                 if cur_time > dt.time(hour=9, minute=15):
+                    logger.info("================================================")
+                    logger.info(f"Found NIFTY_OPEN: {NIFTY_OPEN_TODAY}")
+                    logger.info("================================================")
                     NIFTY_OPEN_TODAY = tick["last_price"]
         elif type(ocdf.loc[tick["instrument_token"], "latest"]) == type(pd.NA):
             ocdf.loc[tick["instrument_token"], "latest"] = tick["last_price"]
