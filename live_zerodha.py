@@ -35,8 +35,8 @@ NIFTY_OPEN_TODAY = False
 ORDERED = False
 EXECUTED = False
 
-if pc.IS_LIVE is False:
-    #NIFTY_OPEN_TODAY = float(22020)
+if pc.INJECT is True:
+    NIFTY_OPEN_TODAY = float(22103.45)
     pass
 NIFTY_PREV_CLOSE = pc.get_previous_day_close()
 assert NIFTY_PREV_CLOSE is not None
