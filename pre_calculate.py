@@ -61,7 +61,7 @@ PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
 NIFTY_LOWER_SIDE = 500 # Points down from previous close
 NIFTY_UPPER_SIDE = 500 # Points down from previous close
-MIN_GAP = 20 # Gap from previous close
+MIN_GAP = 40 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
 BO_LT = .015 # Bracket order limit price w.r.t. actual open price
 EC_PT_RIDE = .6 # How much expectation you are willing to ride
