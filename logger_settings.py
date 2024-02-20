@@ -1,17 +1,18 @@
 import logging
+import datetime as dt
 
 # Configure logging
-log_format = "%(asctime)s - %(levelname)s - [%(thread)d] - \n%(message)s"
+log_format = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - [%(thread)d] - \n%(message)s"
 logging.basicConfig(
     level=logging.INFO, format=log_format
 )
 
 # Create a file handler and set the logging level
-file_handler = logging.FileHandler("default.log")
+file_handler = logging.FileHandler(f"default_{dt.datetime.now().date()}.log")
 file_handler.setLevel(logging.INFO)
 
 # Create a file handler and set the logging level
-error_fh = logging.FileHandler("errors.log")
+error_fh = logging.FileHandler(f"errors_{dt.datetime.now().date()}.log")
 error_fh.setLevel(logging.ERROR)
 
 # Create a console handler and set the logging level
