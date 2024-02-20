@@ -90,7 +90,7 @@ def place_order(ocdf_frame):
 @pc.ct
 def on_ticks(ws, ticks):
     cur_time = dt.datetime.now().time()
-    if cur_time <= pc.MARKET_OPEN or cur_time > pc.WINDOW_CLOSE:
+    if cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE:
         logger.info(f"market not opened yet or window gone: {cur_time}")
         return
     global NIFTY_OPEN_TODAY, EXECUTED

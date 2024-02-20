@@ -41,7 +41,7 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-INJECT = False
+INJECT = True
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * 10 ** 9 # 1B
 MAX_OC = 10
@@ -53,6 +53,7 @@ TODAY = dt.datetime.now().date()
 #TODAY = dt.datetime(year=2024, month=1, day=18).date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
 WINDOW_CLOSE = dt.time(hour=15, minute=15, second=10)
+PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
 if IS_LIVE is False:
     #TODAY = TODAY - dt.timedelta(days=2)
     pass
