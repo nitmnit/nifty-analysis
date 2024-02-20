@@ -29,9 +29,10 @@ def convert_float(num):
 def ct(fn):
     def wraps(*args, **kwargs):
         t1 = dt.datetime.now()
-        fn(*args, **kwargs)
+        res = fn(*args, **kwargs)
         t2 = dt.datetime.now()
         logger.info(f"time taken: fn: {fn.__name__} seconds: {round((t2-t1).total_seconds(), 5)}")
+        return res
     return wraps
 
 """
@@ -50,7 +51,6 @@ IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime("2024-02-22", "%Y-%m-%d")).date()
 TODAY = dt.datetime.now().date()
-TODAY = dt.datetime(year=2024, month=2, day=19).date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
 WINDOW_CLOSE = dt.time(hour=9, minute=15, second=30)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
@@ -155,56 +155,10 @@ def prepare_ocdf():
     # End filtering OC
 
 
-def calculate_results():
-    results = {}
-    tick = cm(0.05)
-    counter = 0
-    nifty_low = prev_day_close - NIFTY_LOWER_SIDE
-    nifty_high = prev_day_close + NIFTY_UPPER_SIDE
-    logger.info(f"Nifty Low: {nifty_low}, mid: {prev_day_close}, High: {nifty_high}")
-    for nifty_open in range(nifty_low, nifty_high + 1):
-        if abs(prev_day_close - nifty_open) < MIN_GAP:
-            continue
-        results[nifty_open] = {}
-        nifty_open_ch = cm(nifty_open - prev_day_close)
-        for i, row in ocdf.iterrows(): 
-            if nifty_open_ch <= 0 and row.option_type == icharts.OPTION_TYPE_CALL:
-                continue
-            if nifty_open_ch >= 0 and row.option_type == icharts.OPTION_TYPE_PUT:
-                continue
-            if row.option_type == icharts.OPTION_TYPE_PUT:
-                nifty_open_ch = - nifty_open_ch
-            ex_chg_pt = nifty_open_ch * row.delta + row.theta
-            ex_chg_pt = ex_chg_pt
-            ex_chg_pc = ex_chg_pt / row.ltp
-            ex_ltp = row.ltp + ex_chg_pt
-            lower_limit = ex_ltp * (1-PREMIUM_THRESHOLD_PC)
-            ex_price = lower_limit
-            while ex_price < ex_ltp:
-                ex_price += tick
-                ac_ch_pt = ex_price - row.ltp
-                ac_ch_pc = ac_ch_pt / row.ltp
-                ac_ex_diff = ac_ch_pc - ex_chg_pc
-                if ac_ex_diff < 0:
-                    bo = {
-                        "lt": cm(ex_price * (1+BO_LT)),
-                        "tp": cm(ex_price * (1+BO_LT) * BO_TP),
-                        "sl": cm(ex_price * BO_SL),
-                    }
-                    results[nifty_open][row.strike_price] = {}
-                    results[nifty_open][row.strike_price][ex_price] = bo
-                counter += 1
-        logger.info(f"nifty: {nifty_open}, counter: {counter}")
-
-    logger.info(f"Final counter: {counter}")
-    logger.info("writing file")
-    df = pd.DataFrame(results)
-    df.to_json("precal.json")
-
-
 def calculate_expected_premium(r, market_open_pt):
     return r.delta * market_open_pt + r.theta
 
+@ct
 def calculate_today_results(ocdf, nifty_open, prev_day_close):
     results = {}
     counter = 0
@@ -219,7 +173,7 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]
     ocdf["ac_ex_diff"] = ocdf["actual_chg_pc"] - ocdf["ec_pc"]
-    ocdf.drop(ocdf.loc[(ocdf.ac_ex_diff > 0) & ocdf.ac_ex_diff.isna()].index, inplace=True)
+    ocdf.drop(ocdf.loc[(ocdf.ec_pc <= 0) | (ocdf.ac_ex_diff > 0) | ocdf.ac_ex_diff.isna()].index, inplace=True)
     ocdf.sort_values(by="ac_ex_diff", inplace=True)
     if ocdf.shape[0] > 0:
         return gap_cleared, ocdf.iloc[0]
@@ -230,21 +184,27 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
 def modify_ticks_for_testing(ocdf, ticks):
     if IS_LIVE is not False:
         exit("IS_LIVE is True")
-    for tick in ticks:
-        ltp = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
-        tick["last_price"] = ltp
-    return ticks
+    new_ticks = []
+    for i, row in ocdf.iterrows():
+        tick = ticks[0].copy()
+        tick["instrument_token"] = row.name
+        tick["last_price"] = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
+        new_ticks.append(tick)
+    return new_ticks
 
 
 def modify_ticks_for_testing_ift(ocdf, ticks):
     if IS_LIVE is not False:
         exit("IS_LIVE is True")
-    for tick in ticks:
-        if tick["instrument_token"] != NIFTY_ITOKEN: 
-            ltp = ku.fetch_stock_data_it(tick["instrument_token"], PREVIOUS_TRADING_DAY, PREVIOUS_TRADING_DAY, INTERVAL_DAY)[0]["close"]
-            tick["last_price"] = ltp
-        else:
-            ltp = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
-            tick["last_price"] = ltp
-    return ticks
+    new_ticks = []
+    for i, row in ocdf.iterrows():
+        tick = ticks[0].copy()
+        tick["instrument_token"] = row.name
+        tick["last_price"] = ku.fetch_stock_data_it(tick["instrument_token"], PREVIOUS_TRADING_DAY, PREVIOUS_TRADING_DAY, INTERVAL_DAY)[0]["close"]
+        new_ticks.append(tick)
+    tick = ticks[0].copy()
+    tick["instrument_token"] = NIFTY_ITOKEN
+    tick["last_price"] = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
+    new_ticks.append(tick)
+    return new_ticks
 
