@@ -11,6 +11,7 @@ import time
 
 
 logger.info("Start trading")
+pd.set_option('display.max_columns', None)
 ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
 
 def convert_float(num):
