@@ -12,6 +12,8 @@ import time
 
 logger.info("Start trading")
 pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 1000)
+
 ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
 
 def convert_float(num):
@@ -46,9 +48,9 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-#IS_LIVE = False
+IS_LIVE = False
 MINIMUM_PREMIUM = 90
-MIN_VOLUME = 2 * 10 ** 9 # 1B
+MIN_VOLUME = 2 * 10 ** 8 # 1B
 MAX_OC = 10
 IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
@@ -64,7 +66,7 @@ PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
 NIFTY_LOWER_SIDE = 500 # Points down from previous close
 NIFTY_UPPER_SIDE = 500 # Points down from previous close
-MIN_GAP = 30 # Gap from previous close
+MIN_GAP = 20 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
 BO_LT = .015 # Bracket order limit price w.r.t. actual open price
 EC_PT_RIDE = .6 # How much expectation you are willing to ride
@@ -177,10 +179,12 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]
     ocdf["ac_ex_diff"] = ocdf["actual_chg_pc"] - ocdf["ec_pc"]
-    ocdf.drop(ocdf.loc[(ocdf.ec_pc <= 0) | (ocdf.ac_ex_diff > 0) | ocdf.ac_ex_diff.isna()].index, inplace=True)
-    ocdf.sort_values(by="ac_ex_diff", inplace=True)
-    if ocdf.shape[0] > 0:
-        return gap_cleared, ocdf.iloc[0]
+    if IS_LIVE is False:
+        logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'volume', 'exchange_token', 'latest', 'change', 'ec_pt', 'ec_pc', 'actual_chg_pc', 'ac_ex_diff']])
+    filtered = ocdf.drop(ocdf.loc[(ocdf.ec_pc <= 0) | (ocdf.ac_ex_diff > 0) | ocdf.ac_ex_diff.isna()].index)
+    filtered.sort_values(by="ac_ex_diff", inplace=True)
+    if filtered.shape[0] > 0:
+        return gap_cleared, filtered.iloc[0]
     else:
         logger.info("no match found")
         return False, None
