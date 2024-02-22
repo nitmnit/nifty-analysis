@@ -45,6 +45,7 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
+#IS_LIVE = False
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * 10 ** 9 # 1B
 MAX_OC = 10
@@ -53,20 +54,20 @@ KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime("2024-02-22", "%Y-%m-%d")).date()
 TODAY = dt.datetime.now().date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
-WINDOW_CLOSE = dt.time(hour=9, minute=15, second=30)
+WINDOW_CLOSE = dt.time(hour=9, minute=15, second=20)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
 if IS_LIVE is False:
-    #TODAY = TODAY - dt.timedelta(days=2)
+    #TODAY = (dt.datetime.strptime("2024-02-19", "%Y-%m-%d")).date()
     pass
 PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
 NIFTY_LOWER_SIDE = 500 # Points down from previous close
 NIFTY_UPPER_SIDE = 500 # Points down from previous close
-MIN_GAP = 40 # Gap from previous close
+MIN_GAP = 30 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
 BO_LT = .015 # Bracket order limit price w.r.t. actual open price
 EC_PT_RIDE = .6 # How much expectation you are willing to ride
-BO_TP = .03 # Target profit percentage w.r.t. buying price
+BO_TP = .015 # Target profit percentage w.r.t. buying price
 BO_SL = .03 # SL percentage w.r.t. buying price
 BUY_QUANTITY = 50 # Number of lots as used by dhan
 NIFTY_ITOKEN = ku.get_nse_instrument_token("NIFTY 50")
@@ -170,7 +171,8 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     nifty_change_pt = nifty_open - prev_day_close
     selected_option_type = OPTION_TYPE_CALL if nifty_change_pt >= 0 else OPTION_TYPE_PUT
     ocdf.drop((ocdf.loc[ocdf.option_type != selected_option_type].index), inplace=True)
-    ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta
+    days_diff = (TODAY-PREVIOUS_TRADING_DAY).days
+    ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta * days_diff
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]
     ocdf["ac_ex_diff"] = ocdf["actual_chg_pc"] - ocdf["ec_pc"]

@@ -55,13 +55,10 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
-    #lp = pc.convert_float(ocdf_frame.latest * (1+pc.BO_LT))
-    exp = ocdf_frame.ec_pt * .75
-    lp = pc.convert_float(ocdf_frame.ltp + (exp * (1 - pc.EC_PT_RIDE)))
-    tp = ocdf_frame.ltp + exp - ocdf_frame.latest
-    tp = pc.convert_float(tp / 2) # Setting half the expectations
-    #tp = pc.convert_float(lp * pc.BO_TP)
-    #sl = pc.convert_float(ocdf_frame.latest * pc.BO_SL)
+    lp = pc.convert_float((1 - pc.EC_PT_RIDE) * ocdf_frame.ltp * (- ocdf_frame.ac_ex_diff))
+    tp = pc.EC_PT_RIDE * ocdf_frame.ltp * abs(ocdf_frame.ac_ex_diff)
+    tp = pc.convert_float(max(tp, ocdf_frame.ltp * pc.BO_TP))
+    sl = pc.convert_float(min(tp, ocdf_frame.ltp * pc.BO_SL))
 
     order_details = {
         "security_id": ocdf_frame.exchange_token, # Done
@@ -70,11 +67,11 @@ def place_order(ocdf_frame):
         "quantity": pc.BUY_QUANTITY, # ???
         "order_type": dhan.LIMIT, # Done
         "product_type": dhan.BO, # Done
-        "price": lp,
+        "price": ocdf_frame.latest + lp,
         "disclosed_quantity": math.ceil(pc.BUY_QUANTITY * .31),
         "validity": dhan.DAY, # Done
         "bo_profit_value": tp,
-        "bo_stop_loss_Value": tp,
+        "bo_stop_loss_Value": sl,
         "drv_expiry_date": ocdf_frame.expiry.strftime("%Y-%m-%d"),
         "drv_options_type": ocdf_frame.display_ot,
         "drv_strike_price": float(ocdf_frame.strike_price),
@@ -137,6 +134,8 @@ def on_ticks(ws, ticks):
         logger.info(f"didn't match all os: {ocdf.shape[0]}, rc: {ocdf.loc[ocdf.change != 0.0].shape[0]} {NIFTY_OPEN_TODAY}")
         logger.info(ocdf[['expiry', 'oc_date', 'strike_price', 'ltp', 'volume', 'option_type', 'exchange_token', 'latest', 'change']])
     logger.info(f"{json.dumps(ticks)}")
+    if pc.IS_LIVE is False and IFT is False:
+        on_ticks(ws, ticks)
 
 def on_connect(ws, response):
     # Callback on successful connect.
