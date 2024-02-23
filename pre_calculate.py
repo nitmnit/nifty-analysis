@@ -48,19 +48,19 @@ Put everything in pickle dataframe to be loaded
  
 ############  CONSTANTS #############
 IS_LIVE = True
-IS_LIVE = False
+#IS_LIVE = False
 MINIMUM_PREMIUM = 90
-MIN_VOLUME = 2 * 10 ** 8 # 1B
+MIN_VOLUME = 2 * (10 ** 7) # 1B
 MAX_OC = 10
 IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
-EXPIRY = (dt.datetime.strptime("2024-02-22", "%Y-%m-%d")).date()
+EXPIRY = (dt.datetime.strptime("2024-02-29", "%Y-%m-%d")).date()
 TODAY = dt.datetime.now().date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
 WINDOW_CLOSE = dt.time(hour=9, minute=15, second=20)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
 if IS_LIVE is False:
-    #TODAY = (dt.datetime.strptime("2024-02-19", "%Y-%m-%d")).date()
+    TODAY = (dt.datetime.strptime("2024-02-21", "%Y-%m-%d")).date()
     pass
 PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
@@ -99,8 +99,6 @@ LIVE: {IS_LIVE}
 EXPIRY: {EXPIRY}
 TODAY: {TODAY}
 PREVIOUS TRADING DAY: {PREVIOUS_TRADING_DAY}
-NIFTY_LOWER_SIDE: {NIFTY_LOWER_SIDE}
-NIFTY_UPPER_SIDE: {NIFTY_UPPER_SIDE}
 """)
 
 
@@ -110,14 +108,11 @@ def prepare_ocdf():
     except FileNotFoundError:
         logger.info("file not found")
         oc = icharts.fetch_option_chain(symbol=IC_SYMBOL, date=PREVIOUS_TRADING_DAY, expiry=EXPIRY)
-        print(oc)
         icharts.save_option_chain_to_file(oc=oc, symbol=IC_SYMBOL, expiry=EXPIRY, date=PREVIOUS_TRADING_DAY)
         ocdf = icharts.get_oc_df(IC_SYMBOL, EXPIRY, PREVIOUS_TRADING_DAY)
-
     # Filter out option chains which are not of interest
     separated_cp = []
     for i, row in ocdf.iterrows():
-        time.sleep(.1)
         ce = {}
         for col, val in row.items():
             if col.startswith("ce_"):
@@ -148,7 +143,7 @@ def prepare_ocdf():
     ocdf["instrument_token"] = ocdf.apply(lambda r: ku.get_fo_instrument(IC_SYMBOL, r.expiry, r.strike_price, r.option_type)["instrument_token"], axis=1)
     ocdf["exchange_token"] = ocdf.apply(lambda r: ku.get_fo_instrument(IC_SYMBOL, r.expiry, r.strike_price, r.option_type)["exchange_token"], axis=1)
     ocdf.set_index("instrument_token", inplace=True)
-    ocdf["ltp"] = ocdf.apply(lambda r: ku.fetch_stock_data_it(r.name, PREVIOUS_TRADING_DAY, PREVIOUS_TRADING_DAY, INTERVAL_DAY)[0]["close"], axis=1)
+    #ocdf["ltp"] = ocdf.apply(lambda r: ku.fetch_stock_data_it(r.name, PREVIOUS_TRADING_DAY, PREVIOUS_TRADING_DAY, INTERVAL_DAY)[0]["close"], axis=1)
     logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'theta', 'ltp', 'exchange_token', "volume"]
     #logger.info(ocdf[['time', 'expiry', 'strike_price', 'option_type', 'delta', 'ltp', 'exchange_token', 'latest', 'change']
 ])

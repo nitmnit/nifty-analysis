@@ -55,8 +55,8 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
-    lp = pc.convert_float((1 - pc.EC_PT_RIDE) * ocdf_frame.ltp * (- ocdf_frame.ac_ex_diff))
-    tp = pc.EC_PT_RIDE * ocdf_frame.ltp * abs(ocdf_frame.ac_ex_diff)
+    lp = pc.convert_float((1 - pc.EC_PT_RIDE) * ocdf_frame.ltp * (- ocdf_frame.ac_ex_diff/2))
+    tp = pc.EC_PT_RIDE * ocdf_frame.ltp * abs(ocdf_frame.ac_ex_diff/2)
     tp = pc.convert_float(max(tp, ocdf_frame.ltp * pc.BO_TP))
     sl = pc.convert_float(min(tp, ocdf_frame.ltp * pc.BO_SL))
 
@@ -106,7 +106,8 @@ def on_ticks(ws, ticks):
     for tick in ticks:
         if IFT:
             if tick["instrument_token"] != pc.NIFTY_ITOKEN:
-                ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
+                pass
+                #ocdf.loc[tick["instrument_token"], "ltp"] = tick["last_price"]
             else:
                 NIFTY_OPEN_TODAY = tick["last_price"]
                 logger.info("================================================")
