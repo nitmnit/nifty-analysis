@@ -168,6 +168,8 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     ocdf.drop((ocdf.loc[ocdf.option_type != selected_option_type].index), inplace=True)
     days_diff = (TODAY-PREVIOUS_TRADING_DAY).days
     ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta * days_diff
+    if selected_option_type == OPTION_TYPE_PUT:
+        ocdf["ec_pt"] = - ocdf["ec_pt"]
     ocdf["ac_ec_pt_diff"] = ocdf["ec_pt"] - ocdf["change"]
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]

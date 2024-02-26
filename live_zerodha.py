@@ -86,7 +86,7 @@ def place_order(ocdf_frame):
 def on_ticks(ws, ticks):
     global NIFTY_OPEN_TODAY, EXECUTED, IFT, ocdf
     cur_time = dt.datetime.now().time()
-    if pc.IS_LIVE and ((cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE) or (cur_time < pc.MARKET_OPEN)):
+    if pc.IS_LIVE and (cur_time < pc.PRE_MARKET_CLOSE or cur_time >= pc.WINDOW_CLOSE):
         logger.info(f"market not opened yet or window gone: {cur_time}")
         logger.info(f"{json.dumps(ticks)}")
         if cur_time >= pc.WINDOW_CLOSE:
