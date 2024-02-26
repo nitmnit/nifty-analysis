@@ -57,7 +57,7 @@ KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime(sys.argv[2], "%Y-%m-%d")).date()
 TODAY = (dt.datetime.strptime(sys.argv[3], "%Y-%m-%d")).date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
-WINDOW_CLOSE = dt.time(hour=9, minute=15, second=20)
+WINDOW_CLOSE = dt.time(hour=9, minute=15, second=10)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
 PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
@@ -215,7 +215,7 @@ def filter_ocdf_on_nifty_open(nifty_open, prev_close, ocdf):
     """
     is_up = (nifty_open - prev_close) > 0
     min_nifty = min(nifty_open, prev_close)
-    s1 = min_nifty - 200
+    s1 = min_nifty - 300
     logger.info(f"is_up: {is_up}, min: {min_nifty}, s1: {s1}")
     option_type = OPTION_TYPE_CALL if is_up else OPTION_TYPE_PUT
     ocdf = ocdf.loc[(ocdf.option_type == option_type) & (ocdf.strike_price >= s1) & (ocdf.strike_price <= nifty_open)]
