@@ -1,4 +1,5 @@
 import os
+import sys
 import datetime as dt
 import icharts
 import historical_data as hd
@@ -47,21 +48,17 @@ Put everything in pickle dataframe to be loaded
 """
  
 ############  CONSTANTS #############
-IS_LIVE = True
-#IS_LIVE = False
+IS_LIVE = sys.argv[1] == "live"
 MINIMUM_PREMIUM = 90
 MIN_VOLUME = 2 * (10 ** 7) # 1B
 MAX_OC = 10
 IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
-EXPIRY = (dt.datetime.strptime("2024-02-29", "%Y-%m-%d")).date()
-TODAY = dt.datetime.now().date()
+EXPIRY = (dt.datetime.strptime(sys.argv[2], "%Y-%m-%d")).date()
+TODAY = (dt.datetime.strptime(sys.argv[3], "%Y-%m-%d")).date()
 MARKET_OPEN = dt.time(hour=9, minute=15)
 WINDOW_CLOSE = dt.time(hour=9, minute=15, second=20)
 PRE_MARKET_CLOSE = dt.time(hour=9, minute=8, second=10) # Adding extra 10 second to avoid any time differences
-if IS_LIVE is False:
-    TODAY = (dt.datetime.strptime("2024-02-21", "%Y-%m-%d")).date()
-    pass
 PREVIOUS_TRADING_DAY = TODAY - dt.timedelta(days=1)
 TODAY_OCDF_PICKLE_FILE_NAME = f"prev_day_oc_analysis_trade_date_{TODAY}.pkl"
 NIFTY_LOWER_SIDE = 500 # Points down from previous close
@@ -69,9 +66,9 @@ NIFTY_UPPER_SIDE = 500 # Points down from previous close
 MIN_GAP = 20 # Gap from previous close
 PREMIUM_THRESHOLD_PC = .10 # Premium might open this down at max to be considered, .3 is 30%
 BO_LT = .015 # Bracket order limit price w.r.t. actual open price
-EC_PT_RIDE = .6 # How much expectation you are willing to ride
-BO_TP = .015 # Target profit percentage w.r.t. buying price
-BO_SL = .03 # SL percentage w.r.t. buying price
+EC_PT_RIDE = .89 # How much expectation you are willing to ride
+BO_TP = .025 # Target profit percentage w.r.t. buying price
+BO_SL = .015 # SL percentage w.r.t. buying price
 BUY_QUANTITY = 50 # Number of lots as used by dhan
 NIFTY_ITOKEN = ku.get_nse_instrument_token("NIFTY 50")
 ############  CONSTANTS END #############
@@ -171,6 +168,7 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     ocdf.drop((ocdf.loc[ocdf.option_type != selected_option_type].index), inplace=True)
     days_diff = (TODAY-PREVIOUS_TRADING_DAY).days
     ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta * days_diff
+    ocdf["ac_ec_pt_diff"] = ocdf["ec_pt"] - ocdf["change"]
     ocdf["ec_pc"] = ocdf["ec_pt"] / ocdf["ltp"]
     ocdf["actual_chg_pc"] = ocdf["change"] / ocdf["ltp"]
     ocdf["ac_ex_diff"] = ocdf["actual_chg_pc"] - ocdf["ec_pc"]
@@ -210,4 +208,16 @@ def modify_ticks_for_testing_ift(ocdf, ticks):
     tick["last_price"] = ku.fetch_stock_data_it(tick["instrument_token"], TODAY, TODAY, INTERVAL_DAY)[0]["open"]
     new_ticks.append(tick)
     return new_ticks
+
+def filter_ocdf_on_nifty_open(nifty_open, prev_close, ocdf):
+    """
+    If opens up, remove puts, otherwise remove calls 
+    """
+    is_up = (nifty_open - prev_close) > 0
+    min_nifty = min(nifty_open, prev_close)
+    s1 = min_nifty - 200
+    logger.info(f"is_up: {is_up}, min: {min_nifty}, s1: {s1}")
+    option_type = OPTION_TYPE_CALL if is_up else OPTION_TYPE_PUT
+    ocdf = ocdf.loc[(ocdf.option_type == option_type) & (ocdf.strike_price >= s1) & (ocdf.strike_price <= nifty_open)]
+    return ocdf
 
