@@ -164,3 +164,6 @@ user-data/
 #.idea/
 data/
 ACCESS_TOKEN
+*.pkl
+*.ods
+*.csv
