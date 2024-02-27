@@ -69,6 +69,7 @@ BO_LT = .015 # Bracket order limit price w.r.t. actual open price
 EC_PT_RIDE = .89 # How much expectation you are willing to ride
 BO_TP = .025 # Target profit percentage w.r.t. buying price
 BO_SL = .015 # SL percentage w.r.t. buying price
+MIN_SL = .021
 BUY_QUANTITY = 50 # Number of lots as used by dhan
 NIFTY_ITOKEN = ku.get_nse_instrument_token("NIFTY 50")
 ############  CONSTANTS END #############
@@ -216,10 +217,11 @@ def filter_ocdf_on_nifty_open(nifty_open, prev_close, ocdf):
     If opens up, remove puts, otherwise remove calls 
     """
     is_up = (nifty_open - prev_close) > 0
-    min_nifty = min(nifty_open, prev_close)
-    s1 = min_nifty - 300
-    logger.info(f"is_up: {is_up}, min: {min_nifty}, s1: {s1}")
     option_type = OPTION_TYPE_CALL if is_up else OPTION_TYPE_PUT
-    ocdf = ocdf.loc[(ocdf.option_type == option_type) & (ocdf.strike_price >= s1) & (ocdf.strike_price <= nifty_open)]
+    ocdf = ocdf.loc[(ocdf.option_type == option_type)]
+    if option_type == OPTION_TYPE_CALL:
+        ocdf = ocdf.loc[(ocdf.strike_price < nifty_open) & (ocdf.strike_price > prev_close - 300)]
+    else:
+        ocdf = ocdf.loc[(ocdf.strike_price > nifty_open) & (ocdf.strike_price < prev_close + 300)]
     return ocdf
 

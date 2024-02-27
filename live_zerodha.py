@@ -58,6 +58,8 @@ def place_order(ocdf_frame):
     lp = pc.convert_float((1 - pc.EC_PT_RIDE) * ocdf_frame.ac_ec_pt_diff / 4)
     tp = pc.convert_float(ocdf_frame.latest * pc.BO_TP)
     sl = pc.convert_float(min(tp, ocdf_frame.latest * pc.BO_SL))
+    sl = pc.convert_float(max(sl, (ocdf_frame.latest + lp) * pc.MIN_SL))
+    tp = max(tp, sl)
 
     order_details = {
         "security_id": ocdf_frame.exchange_token, # Done

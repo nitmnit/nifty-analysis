@@ -11,3 +11,4 @@ bokeh
 #git+https://github.com/pyppeteer/pyppeteer.git@dev
 dhanhq
 jedi-language-server
+websockets
