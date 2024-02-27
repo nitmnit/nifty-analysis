@@ -2,4 +2,4 @@
 cd ~/nse-reports-trade
 source ~/.bashrc
 source nse/bin/activate
-python live_zerodha.py
+python live_zerodha.py live $(date -d "next Thursday" +%Y-%m-%d) $(date +"%Y-%m-%d")
