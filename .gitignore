@@ -167,3 +167,4 @@ ACCESS_TOKEN
 *.pkl
 *.ods
 *.csv
+nse/
