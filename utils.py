@@ -7,6 +7,31 @@ from functools import cache
 from constants import *
 from pytz import timezone  # For timezone handling
 import numpy as np
+from logger_settings import logger
+import heapq
+
+
+class MaxHeap:
+    def __init__(self, max_size):
+        self.max_size = max_size
+        self.heap = []
+
+    def push(self, value):
+        if len(self.heap) < self.max_size:
+            heapq.heappush(self.heap, (-value[0], value))
+        else:
+            if value[0] > -self.heap[0][0]:
+                heapq.heappop(self.heap)
+                heapq.heappush(self.heap, (-value[0], value))
+
+    def pop(self):
+        return heapq.heappop(self.heap)[1]
+
+    def peek(self):
+        return self.heap[0][1]
+
+    def size(self):
+        return len(self.heap)
 
 
 def ct(fn):
@@ -14,17 +39,27 @@ def ct(fn):
         t1 = dt.datetime.now()
         res = fn(*args, **kwargs)
         t2 = dt.datetime.now()
-        print(f"time taken by {__name__}: {round((t2-t1).total_seconds(), 2)} seconds")
+        logger.info(f"time taken by {__name__}: {round((t2-t1).total_seconds(), 2)} seconds")
         return res
     return wraps
 
+def get_date(timestamp):
+    if isinstance(timestamp, dt.datetime):
+        return timestamp.date()
+    elif isinstance(timestamp, dt.date):
+        return timestamp
+    else:
+        raise Exception(f"not date {type(timestamp)}")
+ 
 @cache
 def has_data(symbol, candle_timestamp, interval, exchange):
     file_path = KiteUtil.get_file_path(symbol, candle_timestamp, exchange=exchange, interval=interval)
     try:
         df = pd.read_csv(file_path, index_col="date", parse_dates=True)
+        if interval == INTERVAL_DAY:
+            df = df.loc[df.index.date == get_date(candle_timestamp)]
     except (pd.errors.EmptyDataError, FileNotFoundError):
-        print(f"file not found or empty dateframe for symbol: {symbol} on date: {candle_timestamp}, file_path: {file_path}")
+        logger.info(f"file not found or empty dateframe for symbol: {symbol} on date: {candle_timestamp}, file_path: {file_path}")
         return False, None
     return df.shape[0] != 0, df
 
@@ -39,9 +74,11 @@ def get_last_trading_day(symbol, date, interval, exchange):
 
 @cache
 def get_data(symbol, date, interval, exchange):
+    if isinstance(date, dt.datetime):
+        date = date.date()
     file_path = KiteUtil.get_file_path(symbol, date, exchange=exchange, interval=interval)
     _, df = has_data(symbol, date, interval, exchange)
-    return df
+    return df.loc[df.index.date == date]
 
 @cache
 def find_closest_expiry(symbol, date):
@@ -54,6 +91,18 @@ def find_closest_expiry(symbol, date):
             min_diff = cur_diff
             closest_expiry = expiry_dt
     return closest_expiry
+
+@cache
+def find_nclosest_expiry(symbol, date, n):
+    cur_level = 1
+    dexpiries = [ic.convert_str_to_date(expiry) for expiry in expiries]
+    dexpiries.sort()
+    for expiry in dexpiries:
+        cur_diff = (expiry - date).days
+        if cur_diff >= 0:
+            if cur_level == n:
+                return expiry
+            cur_level += 1
 
 def get_option_chain_file_path(symbol, expiry, date):
     return (f"data/options-historical/option-chain/{expiry.year}/"
@@ -97,3 +146,6 @@ def get_option_chains(dates, ic_symbol):
             ocdf[col] = val
         result.append(ocdf)
     ocdf = pd.concat(result)
+
+def get_quantity(buy_price, lot_size, investment):
+    return (investment // (buy_price * lot_size)) * lot_size

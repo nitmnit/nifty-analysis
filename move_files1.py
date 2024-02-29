@@ -2,7 +2,6 @@ import os
 import shutil
 
 data_folder = "data"  # Replace with the actual path to your data folder
-#new_folder = "data"
 files_copied = []
 
 count = 0
