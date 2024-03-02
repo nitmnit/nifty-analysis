@@ -1,3 +1,6 @@
+from bokeh.plotting import figure
+from bokeh.io import show, output_notebook
+from bokeh.models import CrosshairTool, Range1d
 from historical_data import KiteUtil
 import pandas as pd
 import datetime as dt
@@ -149,3 +152,18 @@ def get_option_chains(dates, ic_symbol):
 
 def get_quantity(buy_price, lot_size, investment):
     return (investment // (buy_price * lot_size)) * lot_size
+
+def bokeh_plot(x, y, x_label, y_label, freq=None):
+    output_notebook()
+    TOOLS = "pan,crosshair,wheel_zoom,hover,box_zoom,reset,save"
+    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=1500)
+    p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
+    crosshair_tool = CrosshairTool(
+                dimensions="both",
+                line_color="red",
+                line_alpha=0.8,
+            )
+    p.add_tools(crosshair_tool)
+    p.circle(x=x, y=y, line_width=2)
+    show(p)
+
