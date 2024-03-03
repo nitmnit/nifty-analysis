@@ -42,6 +42,12 @@ class KiteUtil:
             if instrument["name"] == symbol and instrument["expiry"] == expiry and instrument["segment"] == "NFO-OPT" and instrument["strike"] == strike_price and instrument["instrument_type"] == f"{option_type}E":
                 return instrument
 
+    def get_ft_instrument(self, symbol, expiry):
+        for instrument in self.instruments_list:
+            #print(f'ins nm: {instrument["name"]} ex: {instrument["expiry"]}, seg: {instrument["segment"]}, st: {instrument["strike"]} t: {instrument["instrument_type"]}')
+            if instrument["name"] == symbol and instrument["expiry"] == expiry and instrument["segment"] == "NFO-FUT":
+                return instrument
+
     def get_nse_instrument_token(self, symbol):
         for instrument in self.kite.instruments(exchange=EXCHANGE_NSE):
             if instrument["name"] == symbol:
