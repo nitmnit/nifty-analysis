@@ -6,7 +6,6 @@ import pandas as pd
 import datetime as dt
 import icharts as ic
 from icharts_config import expiries
-from functools import cache
 from constants import *
 from pytz import timezone  # For timezone handling
 import numpy as np
@@ -54,19 +53,18 @@ def get_date(timestamp):
     else:
         raise Exception(f"not date {type(timestamp)}")
  
-@cache
 def has_data(symbol, candle_timestamp, interval, exchange):
     file_path = KiteUtil.get_file_path(symbol, candle_timestamp, exchange=exchange, interval=interval)
     try:
         df = pd.read_csv(file_path, index_col="date", parse_dates=True)
         if interval == INTERVAL_DAY:
             df = df.loc[df.index.date == get_date(candle_timestamp)]
-    except (pd.errors.EmptyDataError, FileNotFoundError):
-        logger.info(f"file not found or empty dateframe for symbol: {symbol} on date: {candle_timestamp}, file_path: {file_path}")
+    except FileNotFoundError:
+        logger.info(f"file not found symbol: {symbol} on date: {candle_timestamp}, file_path: {file_path}")
+    except pd.errors.EmptyDataError:
         return False, None
     return df.shape[0] != 0, df
 
-@cache
 def get_last_trading_day(symbol, date, interval, exchange):
     cur_date = date
     data_available = False
@@ -75,7 +73,6 @@ def get_last_trading_day(symbol, date, interval, exchange):
         data_available, _ = has_data(symbol, cur_date, interval=interval, exchange=exchange)
     return cur_date
 
-@cache
 def get_data(symbol, date, interval, exchange):
     if isinstance(date, dt.datetime):
         date = date.date()
@@ -83,7 +80,23 @@ def get_data(symbol, date, interval, exchange):
     _, df = has_data(symbol, date, interval, exchange)
     return df.loc[df.index.date == date]
 
-@cache
+def get_data_interval(symbol, from_date, to_date, interval, exchange):
+    if interval == INTERVAL_DAY:
+        raise Exception("use get_data for Day interval")
+    if isinstance(from_date, dt.datetime):
+        from_date = from_date.date()
+    if isinstance(to_date, dt.datetime):
+        to_date = to_date.date()
+    results = []
+    cur_date = from_date
+    while cur_date <= to_date:
+        file_path = KiteUtil.get_file_path(symbol, cur_date, exchange=exchange, interval=interval)
+        _, df = has_data(symbol, cur_date, interval, exchange)
+        results += df.to_dict(orient='records', index=True)
+        cur_date += dt.timedelta(days=1)
+    df = pd.DataFrame(results)
+    return df
+
 def find_closest_expiry(symbol, date):
     closest_expiry = None
     min_diff = float('inf')
@@ -95,7 +108,6 @@ def find_closest_expiry(symbol, date):
             closest_expiry = expiry_dt
     return closest_expiry
 
-@cache
 def find_nclosest_expiry(symbol, date, n):
     cur_level = 1
     dexpiries = [ic.convert_str_to_date(expiry) for expiry in expiries]
@@ -112,7 +124,6 @@ def get_option_chain_file_path(symbol, expiry, date):
             f"NIFTY_{ic.convert_date_to_format(expiry)}__"
             f"{ic.convert_cur_date_to_format(date)}_OptionChain.csv")
 
-@cache
 def get_eod_option_chain(symbol, date):
     file_path = KiteUtil.get_file_path(symbol, date, exchange=exchange, interval=interval)
     _, df = has_data(symbol, date, interval, exchange)
@@ -166,4 +177,24 @@ def bokeh_plot(x, y, x_label, y_label, freq=None):
     p.add_tools(crosshair_tool)
     p.circle(x=x, y=y, line_width=2)
     show(p)
+
+def get_price_at(symbol, d, t, interval, exchange):
+    data = get_data(symbol=symbol, date=d, interval=interval, exchange=exchange)
+    try:
+        return data.loc[data.index.time == t].iloc[0].open
+    except IndexError:
+        return pd.NA
+    except AttributeError as e:
+        return pd.NA
+
+def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
+    df = pd.read_csv('api-scrip-master.csv')
+    otype = CE if option_type == OPTION_TYPE_CALL else PE 
+    df["SEM_EXPIRY_DATE"] = pd.to_datetime(df["SEM_EXPIRY_DATE"])
+    match = df.loc[(df.SEM_EXPIRY_DATE.dt.date == expiry) & (df.SEM_STRIKE_PRICE == strike) & (df.SEM_OPTION_TYPE==otype) & (df.SEM_TRADING_SYMBOL.str.startswith(symbol)) & (df.SEM_EXM_EXCH_ID==exchange)]
+    if match.shape[0] > 1:
+        raise Exception(f"more than one match found {df}")
+    if match.empty:
+        return pd.NA
+    return match.iloc[0].to_dict()
 
