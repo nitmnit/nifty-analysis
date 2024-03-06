@@ -8,8 +8,10 @@ from kiteconnect.exceptions import TokenException
 import config
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, List
+from selenium import webdriver
 from time import sleep
 from datetime import datetime, timedelta
+from selenium.webdriver.chrome.options import Options
 import pandas as pd
 import threading
 from constants import *
@@ -83,7 +85,7 @@ class KiteUtil:
         self.kite.set_access_token(access_token)
         return access_token
 
-    def get_params(self, url: str, param_name: str):
+    def get_params(self, url: str, param_name: str) -> Optional[str | None]:
         parsed_url = urlparse(url)  # Parse the URL
         query_string = parsed_url.query  # Extract the query string
         params = parse_qs(query_string)
