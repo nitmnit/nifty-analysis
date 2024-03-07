@@ -164,12 +164,10 @@ def calculate_today_results(ocdf, nifty_open, prev_day_close):
     gap_cleared = abs(prev_day_close - nifty_open) >= MIN_GAP
     if not gap_cleared:
         logger.info(f"Gap not enough today. NO TRADE gap: {prev_day_close - nifty_open}, prev: {prev_day_close}, nifty: {nifty_open}")
-    nifty_open_ch = nifty_open - prev_day_close
     nifty_change_pt = nifty_open - prev_day_close
     selected_option_type = OPTION_TYPE_CALL if nifty_change_pt >= 0 else OPTION_TYPE_PUT
     ocdf.drop((ocdf.loc[ocdf.option_type != selected_option_type].index), inplace=True)
-    days_diff = (TODAY-PREVIOUS_TRADING_DAY).days
-    ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta * days_diff
+    ocdf["ec_pt"] = ocdf.delta * nifty_change_pt + ocdf.theta
     if selected_option_type == OPTION_TYPE_PUT:
         ocdf["ec_pt"] = - ocdf["ec_pt"]
     ocdf["ac_ec_pt_diff"] = ocdf["ec_pt"] - ocdf["change"]

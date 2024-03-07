@@ -61,6 +61,7 @@ def has_data(symbol, candle_timestamp, interval, exchange):
             df = df.loc[df.index.date == get_date(candle_timestamp)]
     except FileNotFoundError:
         logger.info(f"file not found symbol: {symbol} on date: {candle_timestamp}, file_path: {file_path}")
+        return False, None
     except pd.errors.EmptyDataError:
         return False, None
     return df.shape[0] != 0, df
@@ -178,10 +179,13 @@ def bokeh_plot(x, y, x_label, y_label, freq=None):
     p.circle(x=x, y=y, line_width=2)
     show(p)
 
-def get_price_at(symbol, d, t, interval, exchange):
+def get_price_at(symbol, d, t, interval, exchange, get_open=True):
     data = get_data(symbol=symbol, date=d, interval=interval, exchange=exchange)
     try:
-        return data.loc[data.index.time == t].iloc[0].open
+        if get_open:
+            return data.loc[data.index.time == t].iloc[0].open
+        else:
+            return data.loc[data.index.time == t].iloc[0].close
     except IndexError:
         return pd.NA
     except AttributeError as e:
@@ -197,4 +201,22 @@ def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
     if match.empty:
         return pd.NA
     return match.iloc[0].to_dict()
+
+def add_to_time(time, minutes):
+    return (dt.datetime.combine(dt.datetime.now(), time) + dt.timedelta(minutes=minutes)).time()
+
+def get_premium_at(symbol, expiry, strike_price, date, option_type, tm, get_open=True):
+    pr = ic.get_opt_pre_df(symbol=symbol, expiry=expiry, cur_dt=date, strike_price=strike_price, option_type=option_type)
+    if type(pr) == type(pd.NA) or pr.shape[0] == 0:
+        return pd.NA
+    candle = pr.loc[(pr.index.date == date) & (pr.index.time == tm)]
+    if candle.shape[0] == 0:
+        return pd.NA
+    if get_open:
+        return candle.iloc[0].open
+    else:
+        return candle.iloc[0].close
+
+def get_atm_strike(price):
+    return round(price / 50) * 50
 
