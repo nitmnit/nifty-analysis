@@ -1,6 +1,6 @@
 from bokeh.plotting import figure
 from bokeh.io import show, output_notebook
-from bokeh.models import CrosshairTool, Range1d
+from bokeh.models import CrosshairTool, Range1d, LabelSet, WheelZoomTool
 from historical_data import KiteUtil
 import pandas as pd
 import datetime as dt
@@ -165,19 +165,31 @@ def get_option_chains(dates, ic_symbol):
 def get_quantity(buy_price, lot_size, investment):
     return (investment // (buy_price * lot_size)) * lot_size
 
-def bokeh_plot(x, y, x_label, y_label, freq=None):
+def bokeh_plot(x, y, x_label, y_label, freq=None, plot='circle', subplots=None):
     output_notebook()
     TOOLS = "pan,crosshair,wheel_zoom,hover,box_zoom,reset,save"
-    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=1500)
+    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=1800, min_height=800)
     p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
+
     crosshair_tool = CrosshairTool(
                 dimensions="both",
                 line_color="red",
                 line_alpha=0.8,
             )
     p.add_tools(crosshair_tool)
-    p.circle(x=x, y=y, line_width=2)
+    p.toolbar.active_scroll = p.select_one(WheelZoomTool)
+    if plot == 'line':
+        p.line(x=x, y=y, line_width=2)
+    elif plot == 'circle':
+        p.circle(x=x, y=y, line_width=2)
+    if subplots:
+        draw_sub_multiline_plot(p, cds=subplots)
     show(p)
+
+def draw_sub_multiline_plot(p, cds):
+    p.multi_line(xs='xs', ys='ys', line_width=2, color='orange', source=cds)
+    label_set = LabelSet(x='x', y='y', text='texts', x_offset=5, y_offset=5, source=cds)
+    p.add_layout(label_set)
 
 def get_price_at(symbol, d, t, interval, exchange, get_open=True):
     data = get_data(symbol=symbol, date=d, interval=interval, exchange=exchange)
