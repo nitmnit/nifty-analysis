@@ -1,4 +1,5 @@
 from bokeh.plotting import figure
+from bokeh.palettes import Category10
 from bokeh.io import show, output_notebook
 from bokeh.models import CrosshairTool, Range1d, LabelSet, WheelZoomTool
 from historical_data import KiteUtil
@@ -165,10 +166,10 @@ def get_option_chains(dates, ic_symbol):
 def get_quantity(buy_price, lot_size, investment):
     return (investment // (buy_price * lot_size)) * lot_size
 
-def bokeh_plot(x, y, x_label, y_label, freq=None, plot='circle', subplots=None):
+def bokeh_plot(x, y, x_label, y_label, freq=None, plot='circle', multi_plots=None, subplots=None):
     output_notebook()
     TOOLS = "pan,crosshair,wheel_zoom,hover,box_zoom,reset,save"
-    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=1800, min_height=800)
+    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=1800, min_height=1200)
     p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
 
     crosshair_tool = CrosshairTool(
@@ -179,12 +180,18 @@ def bokeh_plot(x, y, x_label, y_label, freq=None, plot='circle', subplots=None):
     p.add_tools(crosshair_tool)
     p.toolbar.active_scroll = p.select_one(WheelZoomTool)
     if plot == 'line':
-        p.line(x=x, y=y, line_width=2)
+        p.line(x=x, y=y, line_width=2, line_color='green')
     elif plot == 'circle':
         p.circle(x=x, y=y, line_width=2)
+    if multi_plots:
+        draw_sub_multiline_plot(p, cds=multi_plots)
     if subplots:
-        draw_sub_multiline_plot(p, cds=subplots)
+        draw_sub_plot(p, subplots)
     show(p)
+
+def draw_sub_plot(p, subplots):
+    for i, subplot in enumerate(subplots):
+        p.triangle(x='x', y='y', source=subplot, size=10, color=Category10[10][i])
 
 def draw_sub_multiline_plot(p, cds):
     p.multi_line(xs='xs', ys='ys', line_width=2, color='orange', source=cds)
