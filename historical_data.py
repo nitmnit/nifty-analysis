@@ -1,4 +1,5 @@
 import csv
+import math
 import os
 import random
 import setup_env  # noqa
@@ -18,6 +19,22 @@ from constants import *
 
 
 #lock = threading.Lock()
+
+ORDER_DETAILS = {
+                    "variety": KiteConnect.VARIETY_REGULAR,
+                    "exchange": KiteConnect.EXCHANGE_NFO,
+                    "tradingsymbol": None,
+                    "transaction_type": None,
+                    "quantity": None,
+                    "product": KiteConnect.PRODUCT_MIS,
+                    "order_type": KiteConnect.ORDER_TYPE_LIMIT,
+                    "price": None,
+                    "validity": KiteConnect.VALIDITY_TTL,
+                    "validity_ttl": 1,
+                    "disclosed_quantity": None,
+                    "trigger_price": "",
+                    "tag": "vol",
+                }
 
 
 class KiteUtil:
@@ -121,6 +138,27 @@ class KiteUtil:
     def fetch_nifty_data(self, interval) -> None:
         symbols = [symbol for symbol in self.instruments.keys() if symbol.startswith("NIFTY")]
         self.fetch_bulk_data(symbols, interval)
+
+    def place_order(self, trading_symbol, transaction_type, quantity, limit_price, tag):
+        order_details = {
+                            "variety": KiteConnect.VARIETY_REGULAR,
+                            "exchange": KiteConnect.EXCHANGE_NFO,
+                            "tradingsymbol": trading_symbol,
+                            "transaction_type": transaction_type,
+                            "quantity": quantity,
+                            "product": KiteConnect.PRODOCT_MIS,
+                            "order_type": KiteConnect.ORDER_TYPE_LIMIT,
+                            "price": limit_price,
+                            "validity": KiteConnect.VARIETY_TTL,
+                            "validity_ttl": 1,
+                            "disclosed_quantity": math.ceil(pc.BUY_QUANTITY * .31),
+                            # "trigger_price": "",
+                            "tag": tag,
+                        }
+
+        order_id = self.kite.place_order(**order_details) 
+        logger.info("Order placed. ID is: {}".format(order_id))
+        return order_id
 
     def fetch_bulk_data(self, symbols: List[str], interval) -> None:
         today = datetime.now()

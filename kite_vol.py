@@ -52,7 +52,7 @@ def on_order_update(ws, data):
 # Assign the callbacks.
 kws.on_ticks = on_ticks
 kws.on_connect = on_connect
-kws.on_close = on_close
+#kws.on_close = on_close
 kws.on_order_update = on_order_update
 
 # Infinite loop on the main thread. Nothing after this will run.

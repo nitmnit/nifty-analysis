@@ -15,59 +15,10 @@ logger.info("Start dhan_gapup")
 dhan = dhanhq(config.DHAN_CLIENT_ID, config.DHAN_ACCESS_TOKEN)
 dhan.get_fund_limits()
 
-if __name__ == '__main__':
-    is_live = sys.argv[1] == "live"
-    command = sys.argv[2]
-    buy_date = dtstrptime(sys.argv[3], "%Y-%m-%d").date()
-    sell_date = dtstrptime(sys.argv[4], "%Y-%m-%d").date()
-    expiry = dtstrptime(sys.argv[5], "%Y-%m-%d").date()
-
-    prs = {
-            "nifty_price_time": dt.time(hour=15, minute=20),
-            "buy_at": dt.time(hour=15, minute=26),
-            "kite_symbol": "NIFTY 50",
-            "symbol": "NIFTY",
-            "interval": INTERVAL_MINUTE,
-            "exchange": EXCHANGE_NSE,
-            "strike_i": -5,
-            "is_live": is_live,
-            "buy_date": buy_date,
-            "sell_date": sell_date,
-            "expiry": expiry,
-            "quantity": 10,
-            "option_type": "CALL",
-            "exchange_segment_enum": DHAN_EXCHANGE_SEGMENTS_ENUM["NSE_FNO"],
-    }
-
-    logger.info(prs)
-    waiting = True
-
-    while is_live and (dt.dtnow() < prs["nifty_price_time"] + dt.timedelta(minute=2)):
-        if waiting:
-            logger.info(f"waiting, curtime: {dt.dtnow()}")
-            waiting = False
-        time.sleep(1)
-
-    if not waiting:
-        logger.info("wait over")
-
-    if command == 'entry':
-        od = get_order_details(prs)
-        subscribe(od)
-    elif command == 'exit':
-        gapup_exit()
-
-def get_strike(strike, i):
-    divider = 50
-    reminder = strike % divider
-    if reminder != 0:
-        return divider * (strike // divider) - i * divider
-    return divider * (strike // divider) - (i+1) * divider
-
-
 @ut.ct
 def get_order_details(prs):
-    nifty_before_buy = ut.get_price_at(symbol=prs["kite_symbol"], d=prs["buy_date"], t=prs["nifty_price_time"], interval=prs["interval"], exchange=prs["exchange"])
+    #nifty_before_buy = ut.get_price_at(symbol=prs["kite_symbol"], d=prs["buy_date"], t=prs["nifty_price_time"], interval=prs["interval"], exchange=prs["exchange"])
+    nifty_before_buy = 22450
     atm = round(nifty_before_buy / 50) * 50
     selected_strike = get_strike(atm, prs["strike_i"])
     instrument = ut.get_fo_instrument_details(prs["symbol"], expiry=prs["expiry"], strike=selected_strike, option_type=OPTION_TYPE_CALL, exchange=prs["exchange"])
@@ -87,6 +38,14 @@ def get_order_details(prs):
         "tag": 'h1',
     }
     return order_details
+
+
+def get_strike(strike, i):
+    divider = 50
+    reminder = strike % divider
+    if reminder != 0:
+        return divider * (strike // divider) - i * divider
+    return divider * (strike // divider) - (i+1) * divider
 
 
 async def on_connect(instance):
@@ -120,4 +79,47 @@ def subscribe(prs, od):
     #loop = asyncio.get_event_loop()
     feed.run_forever()
     asyncio.create_task(feed.run_forever())
+
+
+if __name__ == '__main__':
+    is_live = sys.argv[1] == "live"
+    command = sys.argv[2]
+    buy_date = dt.datetime.strptime(sys.argv[3], "%Y-%m-%d").date()
+    sell_date = dt.datetime.strptime(sys.argv[4], "%Y-%m-%d").date()
+    expiry = dt.datetime.strptime(sys.argv[5], "%Y-%m-%d").date()
+
+    prs = {
+            "nifty_price_time": dt.time(hour=15, minute=20),
+            "buy_at": dt.time(hour=15, minute=26),
+            "kite_symbol": "NIFTY 50",
+            "symbol": "NIFTY",
+            "interval": INTERVAL_MIN1,
+            "exchange": EXCHANGE_NSE,
+            "strike_i": -1,
+            "is_live": is_live,
+            "buy_date": buy_date,
+            "sell_date": sell_date,
+            "expiry": expiry,
+            "quantity": 10,
+            "option_type": "CALL",
+            "exchange_segment_enum": DHAN_EXCHANGE_SEGMENTS_ENUM["NSE_FNO"],
+    }
+
+    logger.info(prs)
+    waiting = True
+
+    while is_live and (dt.dtnow() < prs["nifty_price_time"] + dt.timedelta(minute=2)):
+        if waiting:
+            logger.info(f"waiting, curtime: {dt.dtnow()}")
+            waiting = False
+        time.sleep(1)
+
+    if not waiting:
+        logger.info("wait over")
+
+    if command == 'entry':
+        od = get_order_details(prs)
+        subscribe(prs, od)
+    elif command == 'exit':
+        gapup_exit()
 

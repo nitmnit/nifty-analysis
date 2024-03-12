@@ -12,3 +12,4 @@ bokeh
 dhanhq
 jedi-language-server
 websockets
+TA-Lib
