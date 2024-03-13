@@ -172,12 +172,23 @@ def bokeh_plot(cds, x_label, y_label, freq=None, plot='circle', multi_plots=None
     p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=2100, min_height=1000)
     p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
 
+    crosshair_tool = CrosshairTool(
+                dimensions="both",
+                line_color="red",
+                line_alpha=0.8,
+            )
+    p.add_tools(crosshair_tool)
+    p.toolbar.active_scroll = p.select_one(WheelZoomTool)
+    if plot == 'line':
+        line1 = p.line(x='id', y='last_price', source=cds, line_width=2, line_color='green', line_alpha=0.5)
+    elif plot == 'circle':
+        p.circle(x='id', y='last_price', source=cds, line_width=2)
     hvt = HoverTool(
         tooltips=[
             ( 'last_trade_time',   '@last_trade_time{%H:%M:%S}'            ),
             ( 'last_price',  '$@{last_price}{%0.2f}' ), # use @{ } for field names with spaces
             ( 'volume', '@volume{0.00 a}'),
-            ( 'oi', '@oi{0.00 a}'),
+            ( 'oi', '@oi{0.00000 a}'),
             ( 'id', '@id'),
             ( '(x,y)', '($x{int}, $y)'),
         ],
@@ -186,20 +197,10 @@ def bokeh_plot(cds, x_label, y_label, freq=None, plot='circle', multi_plots=None
             '@{last_price}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
         },
         # display a tooltip whenever the cursor is vertically in line with a glyph
-        mode='vline'
+        mode='vline',
+        renderers=[line1],
     )
-    crosshair_tool = CrosshairTool(
-                dimensions="both",
-                line_color="red",
-                line_alpha=0.8,
-            )
-    p.add_tools(crosshair_tool)
     p.add_tools(hvt)
-    p.toolbar.active_scroll = p.select_one(WheelZoomTool)
-    if plot == 'line':
-        p.line(x='id', y='last_price', source=cds, line_width=2, line_color='green', line_alpha=0.5)
-    elif plot == 'circle':
-        p.circle(x='id', y='last_price', source=cds, line_width=2)
     if multi_plots:
         draw_sub_multiline_plot(p, cds=multi_plots)
     if subplots:

@@ -1,6 +1,6 @@
 from kiteconnect import KiteTicker
 import datetime as dt
-from logger_settings import logger
+from tick_logger_settings import logger
 import config
 import historical_data as hd
 from constants import *
@@ -12,17 +12,21 @@ IC_SYMBOL = "NIFTY"
 KITE_SYMBOL = "NIFTY 50"
 EXPIRY = (dt.datetime.strptime(sys.argv[2], "%Y-%m-%d")).date()
 TODAY = (dt.datetime.strptime(sys.argv[3], "%Y-%m-%d")).date()
-STRIKE = int(sys.argv[4])
+#STRIKE = int(sys.argv[4])
+ATM = int(sys.argv[4])
+STRIKES = list(range(ATM-500, ATM+500, 50))
+#STRIKES = list(map(int, sys.argv[4].split(',')))
 OPTION_TYPE = sys.argv[5]
 assert OPTION_TYPE in [OPTION_TYPE_CALL, OPTION_TYPE_PUT]
 
 # Initialise
 ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
 kws = KiteTicker(config.KITE_API_KEY, ku.access_token)
-instrument = ku.get_fo_instrument(IC_SYMBOL, EXPIRY, STRIKE, OPTION_TYPE)
-print(instrument)
 
+instruments = [ku.get_fo_instrument(IC_SYMBOL, EXPIRY, STRIKE, OPTION_TYPE) for STRIKE in STRIKES]
+print(instruments)
 
+logger.info("[")
 class DateTimeEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, dt.datetime):
@@ -37,8 +41,8 @@ def on_ticks(ws, ticks):
         pass
 
 def on_connect(ws, response):
-    ws.subscribe([instrument["instrument_token"]])
-    ws.set_mode(ws.MODE_FULL, [instrument["instrument_token"]])
+    ws.subscribe([instrument["instrument_token"] for instrument in instruments])
+    ws.set_mode(ws.MODE_FULL, [instrument["instrument_token"] for instrument in instruments])
     ws._vol_in_order = False
 
 def on_close(ws, code, reason):
@@ -57,4 +61,7 @@ kws.on_order_update = on_order_update
 
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
-kws.connect()
+try:
+    kws.connect()
+except KeyboardInterrupt:
+    logger.info("]")

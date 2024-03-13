@@ -55,7 +55,7 @@ def place_order(ocdf_frame):
     if ORDERED:
         return
     ORDERED = True
-    lp = pc.convert_float((1 - pc.EC_PT_RIDE) * ocdf_frame.ac_ec_pt_diff / 4)
+    lp = pc.convert_float((1 - pc.EC_PT_RIDE) * ocdf_frame.ac_ec_pt_diff / 2)
     tp = pc.convert_float(ocdf_frame.latest * pc.BO_TP)
     sl = pc.convert_float(min(tp, ocdf_frame.latest * pc.BO_SL))
     sl = pc.convert_float(max(sl, (ocdf_frame.latest + lp) * pc.MIN_SL))
@@ -156,12 +156,12 @@ def on_close(ws, code, reason):
     # On connection close stop the main loop
     # Reconnection will not happen after executing `ws.stop()`
     logger.info(f"closed connection: {reason}")
-    ws.stop()
+    #ws.stop()
 
 # Assign the callbacks.
 kws.on_ticks = on_ticks
 kws.on_connect = on_connect
-kws.on_close = on_close
+#kws.on_close = on_close
 
 # Infinite loop on the main thread. Nothing after this will run.
 # You have to use the pre-defined callbacks to manage subscriptions.
