@@ -1,7 +1,7 @@
 from bokeh.plotting import figure
 from bokeh.palettes import Category10
 from bokeh.io import show, output_notebook
-from bokeh.models import CrosshairTool, Range1d, LabelSet, WheelZoomTool
+from bokeh.models import CrosshairTool, Range1d, LabelSet, WheelZoomTool, HoverTool
 from historical_data import KiteUtil
 import pandas as pd
 import datetime as dt
@@ -166,12 +166,26 @@ def get_option_chains(dates, ic_symbol):
 def get_quantity(buy_price, lot_size, investment):
     return (investment // (buy_price * lot_size)) * lot_size
 
-def bokeh_plot(x, y, x_label, y_label, freq=None, plot='circle', multi_plots=None, subplots=None, subplot_labels=None):
+def bokeh_plot(cds, x_label, y_label, freq=None, plot='circle', multi_plots=None, subplots=None, subplot_labels=None):
     output_notebook()
     TOOLS = "pan,crosshair,wheel_zoom,hover,box_zoom,reset,save"
-    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=1800, min_height=1200)
+    p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=2100, min_height=1000)
     p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
 
+    #hvt = HoverTool(
+    #    tooltips=[
+    #        ( 'id',   '@date{%F}'            ),
+    #        ( 'last_price',  '$@{adj close}{%0.2f}' ), # use @{ } for field names with spaces
+    #        ( 'volume', '@volume{0.00 a}'      ),
+    #    ],
+    #    formatters={
+    #        '@date'        : 'datetime', # use 'datetime' formatter for '@date' field
+    #        '@{adj close}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
+    #                                     # use default 'numeral' formatter for other fields
+    #    },
+    #    # display a tooltip whenever the cursor is vertically in line with a glyph
+    #    mode='vline'
+    #)
     crosshair_tool = CrosshairTool(
                 dimensions="both",
                 line_color="red",
@@ -180,9 +194,9 @@ def bokeh_plot(x, y, x_label, y_label, freq=None, plot='circle', multi_plots=Non
     p.add_tools(crosshair_tool)
     p.toolbar.active_scroll = p.select_one(WheelZoomTool)
     if plot == 'line':
-        p.line(x=x, y=y, line_width=2, line_color='green', line_alpha=0.5)
+        p.line(x='id', y='last_price', source=cds, line_width=2, line_color='green', line_alpha=0.5)
     elif plot == 'circle':
-        p.circle(x=x, y=y, line_width=2)
+        p.circle(x='id', y='last_price', source=cds, line_width=2)
     if multi_plots:
         draw_sub_multiline_plot(p, cds=multi_plots)
     if subplots:
