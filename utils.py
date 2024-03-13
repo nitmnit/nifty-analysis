@@ -172,26 +172,29 @@ def bokeh_plot(cds, x_label, y_label, freq=None, plot='circle', multi_plots=None
     p = figure(title="Bokeh Line Plot", x_axis_label=x_label, y_axis_label=y_label, min_width=2100, min_height=1000)
     p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
 
-    #hvt = HoverTool(
-    #    tooltips=[
-    #        ( 'id',   '@date{%F}'            ),
-    #        ( 'last_price',  '$@{adj close}{%0.2f}' ), # use @{ } for field names with spaces
-    #        ( 'volume', '@volume{0.00 a}'      ),
-    #    ],
-    #    formatters={
-    #        '@date'        : 'datetime', # use 'datetime' formatter for '@date' field
-    #        '@{adj close}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
-    #                                     # use default 'numeral' formatter for other fields
-    #    },
-    #    # display a tooltip whenever the cursor is vertically in line with a glyph
-    #    mode='vline'
-    #)
+    hvt = HoverTool(
+        tooltips=[
+            ( 'last_trade_time',   '@last_trade_time'            ),
+            ( 'last_price',  '$@{last_price}{%0.2f}' ), # use @{ } for field names with spaces
+            ( 'volume', '@volume{0.00 a}'),
+            ( 'id', '@id'),
+            ( '(x,y)', '($x{int}, $y{%0.2f})'),
+        ],
+        formatters={
+            #'@last_trade_time'        : 'datetime', # use 'datetime' formatter for '@date' field
+            '@{last_price}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
+            '@{(x,y)}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
+        },
+        # display a tooltip whenever the cursor is vertically in line with a glyph
+        mode='vline'
+    )
     crosshair_tool = CrosshairTool(
                 dimensions="both",
                 line_color="red",
                 line_alpha=0.8,
             )
     p.add_tools(crosshair_tool)
+    p.add_tools(hvt)
     p.toolbar.active_scroll = p.select_one(WheelZoomTool)
     if plot == 'line':
         p.line(x='id', y='last_price', source=cds, line_width=2, line_color='green', line_alpha=0.5)
