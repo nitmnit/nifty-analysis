@@ -174,16 +174,16 @@ def bokeh_plot(cds, x_label, y_label, freq=None, plot='circle', multi_plots=None
 
     hvt = HoverTool(
         tooltips=[
-            ( 'last_trade_time',   '@last_trade_time'            ),
+            ( 'last_trade_time',   '@last_trade_time{%H:%M:%S}'            ),
             ( 'last_price',  '$@{last_price}{%0.2f}' ), # use @{ } for field names with spaces
             ( 'volume', '@volume{0.00 a}'),
+            ( 'oi', '@oi{0.00 a}'),
             ( 'id', '@id'),
-            ( '(x,y)', '($x{int}, $y{%0.2f})'),
+            ( '(x,y)', '($x{int}, $y)'),
         ],
         formatters={
-            #'@last_trade_time'        : 'datetime', # use 'datetime' formatter for '@date' field
+            '@last_trade_time'        : 'datetime', # use 'datetime' formatter for '@date' field
             '@{last_price}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
-            '@{(x,y)}' : 'printf',   # use 'printf' formatter for '@{adj close}' field
         },
         # display a tooltip whenever the cursor is vertically in line with a glyph
         mode='vline'
