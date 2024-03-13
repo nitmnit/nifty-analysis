@@ -3,15 +3,16 @@ from logger_settings import logger
 from collections import deque
 
 
-START_TIME = dt.datetime.now().replace(year=2024, month=3, day=1)
+START_TIME = dt.datetime.now().replace(year=2024, month=3, day=1, hour=0, minute=0, second=0, microsecond=0)
 
 class Tick:
-    def __init__(self, last_price, last_traded_quantity, total_buy_quantity, total_sell_quantity, last_trade_time, oi):
+    def __init__(self, last_price, last_traded_quantity, total_buy_quantity, total_sell_quantity, last_trade_time, volume, oi):
         self.last_price = last_price
         self.last_traded_quantity = last_traded_quantity
         self.total_buy_quantity = total_buy_quantity
         self.total_sell_quantity = total_sell_quantity
         self.last_trade_time = last_trade_time
+        self.volume = volume
         self.oi = oi
         self.id = (last_trade_time - START_TIME).seconds
 
@@ -19,7 +20,7 @@ class Tick:
         return self.__repr__()
 
     def __repr__(self):
-        return f"Tick: {self.id} {round(self.last_price, 2)}"
+        return f"Tick: {self.id} {round(self.last_price, 2)}, v: {self.volume}"
 
 
 class Direction:
@@ -41,7 +42,8 @@ class Phase:
     STATUS_HARD_RETR = 'HARD RETRACING'
 
     def __repr__(self):
-        return f"Continuation: {self.direction}, {self.status} from {self.t_start} to {self.t_end}, confirmation:{self.started_at} terminated at: {self.terminated_at}, hard retracel: {self.hard_retraced_at}, soft: {self.soft_retraced_at}"
+        #return f"Continuation: {self.direction}, {self.status} from {self.t_start} to {self.t_end}, confirmation:{self.started_at} terminated at: {self.terminated_at}, hard retracel: {self.hard_retraced_at}, soft: {self.soft_retraced_at}"
+        return f"Continuation: {self.direction}, {self.status} from {self.t_start} to {self.t_end}, confirmation:{self.started_at} terminated at: {self.terminated_at}, hard retracel: {self.hard_retraced_at}, soft: {self.soft_retraced_at}, conf: {self.confidence_at_confirmation}"
 
     def __str__(self):
         return self.__repr__()
@@ -66,20 +68,19 @@ class Phase:
         for idx_sl in range(len(self.second_last_5sec)):
             if close_id - self.second_last_5sec[idx_sl].id <= n:
                 ticks.append(self.second_last_5sec[idx_sl])
-        for idx_l in range(len(self.last_5sec)):
-            ticks.append(self.last_5sec[idx_l])
-        if close_id == 22475:
-            print(f"n: {n}, t: {ticks}, {self.last_5sec}, {self.second_last_5sec}")
+        for tick in self.last_5sec:
+            ticks.append(tick)
         return ticks
 
     def update_last_nsec(self, tick):
         """
         Updates the state for last_5sec and second_last_5sec when new ticks arrive
         """
-        if self.second_last_5sec.period < self.pm.settings.CONFIRM_TICKS:
-            self.second_last_5sec.append(tick)
-            return
         self.last_5sec.append(tick)
+        if self.second_last_5sec.period < self.pm.settings.CONFIRM_TICKS:
+            x = self.last_5sec.popleft()
+            self.second_last_5sec.append(x)
+            return
         while self.last_5sec.period > self.pm.settings.CONFIRM_TICKS:
             x = self.last_5sec.popleft()
             self.second_last_5sec.append(x)
@@ -164,14 +165,18 @@ class Candle(deque):
         else:
             self.HIGH = max(x.last_price, self.HIGH)
             self.LOW = min(x.last_price, self.LOW)
+    
+    @property
+    def volume(self):
+        if len(self) == 0:
+            return 0
+        return sum([t.volume for t in self]) / len(self)
 
     def popleft(self):
-        if self.period < self.confirm_ticks:
-            raise Exception("not full yet")
         x = super().popleft()
-        if self.HIGH == x.last_price:
+        if len(self) > 0 and self.HIGH == x.last_price:
             self.HIGH = max(self, key=lambda k: k.last_price).last_price
-        if self.LOW == x.last_price:
+        if len(self) > 0 and self.LOW == x.last_price:
             self.LOW = min(self, key=lambda k: k.last_price).last_price
         return x
 
@@ -209,6 +214,24 @@ class Candle(deque):
             return
         return self[-1].id
 
+    @property
+    def confidence(self):
+        if len(self) <= 1:
+            return 0
+        up_sum = 0
+        down_sum = 0
+
+        total = (up_sum + abs(down_sum))
+        if total == 0:
+            return 0
+        for i in range(1, len(self)):
+            change = self[i].last_price - self[i-1].last_price
+            if change >= 0:
+                up_sum += change
+            else:
+                down_sum += change
+        return up_sum * 100 / (up_sum + abs(down_sum))
+
 
 class PhaseStartFailed(Exception):
     pass
@@ -230,13 +253,23 @@ class PhaseManager:
     def get_pc_tick(self, tick):
         if len(self.ticks) == 0:
             self.first_pc = tick
+#        pc_tick = {
+#            'last_price': (tick['last_price'] - self.first_pc['last_price']) * 100 / self.first_pc['last_price'],
+#            'last_traded_quantity': (tick['last_traded_quantity'] - self.first_pc['last_traded_quantity']) * 100 / self.first_pc['last_traded_quantity'],
+#            'total_buy_quantity': (tick['total_buy_quantity'] - self.first_pc['total_buy_quantity']) * 100 / self.first_pc['total_buy_quantity'],
+#            'total_sell_quantity': (tick['total_sell_quantity'] - self.first_pc['total_sell_quantity']) * 100 / self.first_pc['total_sell_quantity'],
+#            'last_trade_time': tick['last_trade_time'],
+#            'volume': tick['volume'],
+#            'oi': (tick['oi'] - self.first_pc['oi']) * 100 / self.first_pc['oi'],
+#        }
         pc_tick = {
-            'last_price': (tick['last_price'] - self.first_pc['last_price']) * 100 / self.first_pc['last_price'],
-            'last_traded_quantity': (tick['last_traded_quantity'] - self.first_pc['last_traded_quantity']) * 100 / self.first_pc['last_traded_quantity'],
-            'total_buy_quantity': (tick['total_buy_quantity'] - self.first_pc['total_buy_quantity']) * 100 / self.first_pc['total_buy_quantity'],
-            'total_sell_quantity': (tick['total_sell_quantity'] - self.first_pc['total_sell_quantity']) * 100 / self.first_pc['total_sell_quantity'],
+            'last_price': tick['last_price'],
+            'last_traded_quantity': tick['last_traded_quantity'],
+            'total_buy_quantity': tick['total_buy_quantity'],
+            'total_sell_quantity': tick['total_sell_quantity'],
             'last_trade_time': tick['last_trade_time'],
-            'oi': (tick['oi'] - self.first_pc['oi']) * 100 / self.first_pc['oi'],
+            'volume': tick['volume'],
+            'oi': tick['oi'],
         }
         tick_obj = Tick(**pc_tick)
         self.current_id += 1
@@ -279,7 +312,7 @@ class PhaseManager:
                 self.current_order.square_off(tick.last_price)
                 self.closed_orders.append(PhaseOrder(phase, self.current_order))
                 self.current_order = None
-            logger.info(f"hard retracel {phase}, Up change %: {phase.started_at.last_price - phase.hard_retraced_at.last_price}")
+            logger.info(f"hard retracel {phase}, Up change %: {phase.hard_retraced_at.last_price - phase.started_at.last_price}")
         else:
             logger.info(f"hard retracel {phase}, Down change %: {phase.started_at.last_price - phase.hard_retraced_at.last_price}")
 
