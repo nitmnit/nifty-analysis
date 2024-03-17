@@ -220,9 +220,9 @@ def bokeh_plot(
     multi_plots=None,
     subplots=None,
     subplot_labels=None,
+    index_field="id",
 ):
     output_notebook()
-    TOOLS = "pan,crosshair,wheel_zoom,hover,box_zoom,reset,save"
     p = figure(
         title="Bokeh Line Plot",
         x_axis_label=x_label,
@@ -241,7 +241,7 @@ def bokeh_plot(
     p.toolbar.active_scroll = p.select_one(WheelZoomTool)
     if plot == "line":
         line1 = p.line(
-            x="id",
+            x=index_field,
             y="last_price",
             source=cds,
             line_width=2,
@@ -249,7 +249,7 @@ def bokeh_plot(
             line_alpha=0.5,
         )
     elif plot == "circle":
-        p.circle(x="id", y="last_price", source=cds, line_width=2)
+        p.circle(x=index_field, y="last_price", source=cds, line_width=2)
     hvt = HoverTool(
         tooltips=[
             ("last_trade_time", "@last_trade_time{%H:%M:%S}"),
@@ -259,7 +259,7 @@ def bokeh_plot(
             ),  # use @{ } for field names with spaces
             ("volume", "@volume{0.00 a}"),
             ("oi", "@oi{0.00000 a}"),
-            ("id", "@id"),
+            (index_field, f"@{index_field}"),
             ("(x,y)", "($x{int}, $y)"),
         ],
         formatters={
@@ -385,19 +385,15 @@ def get_ticks(symbol, expiry, strike, otype, date):
     tdf["last_trade_time"] = pd.to_datetime(
         tdf["last_trade_time"], format="%Y-%m-%d %H:%M:%S"
     )
-    tdf.set_index("last_trade_time", inplace=True, drop=False)
     tdf["volume"] = tdf.volume_traded - tdf.volume_traded.shift(1)
     tdf.drop("volume_traded", inplace=True, axis=1)
     tdf.fillna({"volume": 0}, inplace=True)
+    tdf["id"] = (tdf.last_trade_time -
+                 tdf.iloc[0].last_trade_time).dt.total_seconds()
+    tdf["id"] = pd.to_numeric(tdf["id"], downcast="integer")
     return tdf
 
 
 class ZerodhaOrderManager(OrderManager):
     def __init__(self):
         pass
-
-    def place_order(self):
-        logger.info("place_order called")
-
-    def has_intrade_orders(self):
-        logger.info("has_intrade_orders called")
