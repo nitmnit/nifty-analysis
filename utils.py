@@ -3,6 +3,7 @@ from bokeh.plotting import figure
 from bokeh.palettes import Category10
 from bokeh.io import show, output_notebook
 from bokeh.models import CrosshairTool, Range1d, LabelSet, WheelZoomTool, HoverTool
+from base import OrderManager
 from historical_data import KiteUtil
 import pandas as pd
 import datetime as dt
@@ -389,3 +390,14 @@ def get_ticks(symbol, expiry, strike, otype, date):
     tdf.drop("volume_traded", inplace=True, axis=1)
     tdf.fillna({"volume": 0}, inplace=True)
     return tdf
+
+
+class ZerodhaOrderManager(OrderManager):
+    def __init__(self):
+        pass
+
+    def place_order(self):
+        logger.info("place_order called")
+
+    def has_intrade_orders(self):
+        logger.info("has_intrade_orders called")

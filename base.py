@@ -4,47 +4,10 @@ from typing import Dict
 from logger_settings import logger
 
 
-"""
-class Tick:
-    START_TIME = None
-
-    def __init__(
-        self,
-        last_price,
-        last_traded_quantity,
-        total_buy_quantity,
-        total_sell_quantity,
-        last_trade_time,
-        volume,
-        oi=None,
-    ):
-        self.last_price = last_price
-        self.last_traded_quantity = last_traded_quantity
-        self.total_buy_quantity = total_buy_quantity
-        self.total_sell_quantity = total_sell_quantity
-        self.last_trade_time = last_trade_time
-        self.volume = volume
-        self.oi = oi
-        if Tick.START_TIME is None:
-            # This is with the assumption that the first tick will always be the farthest time
-            Tick.START_TIME = last_trade_time.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-        self.id = (last_trade_time - Tick.START_TIME).seconds
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return f"Tick: {self.id} {round(self.last_price, 2)}, v: {self.volume}"
-
-"""
-
-
 class Strategy:
     def __init__(self, instrument: "Instrument", settings: Dict):
         self.instrument = instrument
-        self.ticks = None
+        self.ticks: pd.DataFrame | None = None
         for key, val in settings.items():
             setattr(self, key, val)
 
@@ -149,6 +112,21 @@ class PhaseOrder:
         return f"{self.order}, Phase: {self.phase}"
 
 
+class OrderManager:
+    """
+    High level utility to manager orders to keep it independent of underlying APIs
+    """
+
+    def __init__(self):
+        pass
+
+    def place_order(self):
+        logger.info("place_order called")
+
+    def has_intrade_orders(self):
+        logger.info("has_intrade_orders called")
+
+
 class BasePhaseStrategy(Strategy):
     def __init__(self, instrument, settings):
         super().__init__(instrument=instrument, settings=settings)
@@ -160,7 +138,7 @@ class BasePhaseStrategy(Strategy):
         self.closed_orders = []
 
     def next(self, tick):
-        raise NotImplementedError
+        super().next(tick)
 
     def on_phase_confirmed(self):
         pass
