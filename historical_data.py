@@ -18,23 +18,23 @@ import threading
 from constants import *
 
 
-#lock = threading.Lock()
+# lock = threading.Lock()
 
 ORDER_DETAILS = {
-                    "variety": KiteConnect.VARIETY_REGULAR,
-                    "exchange": KiteConnect.EXCHANGE_NFO,
-                    "tradingsymbol": None,
-                    "transaction_type": None,
-                    "quantity": None,
-                    "product": KiteConnect.PRODUCT_MIS,
-                    "order_type": KiteConnect.ORDER_TYPE_LIMIT,
-                    "price": None,
-                    "validity": KiteConnect.VALIDITY_TTL,
-                    "validity_ttl": 1,
-                    "disclosed_quantity": None,
-                    "trigger_price": "",
-                    "tag": "vol",
-                }
+    "variety": KiteConnect.VARIETY_REGULAR,
+    "exchange": KiteConnect.EXCHANGE_NFO,
+    "tradingsymbol": None,
+    "transaction_type": None,
+    "quantity": None,
+    "product": KiteConnect.PRODUCT_MIS,
+    "order_type": KiteConnect.ORDER_TYPE_LIMIT,
+    "price": None,
+    "validity": KiteConnect.VALIDITY_TTL,
+    "validity_ttl": 1,
+    "disclosed_quantity": None,
+    "trigger_price": "",
+    "tag": "vol",
+}
 
 
 class KiteUtil:
@@ -48,21 +48,36 @@ class KiteUtil:
         self.instruments_list = self.kite.instruments(exchange)
         self.exchange = exchange
         self.fetch_instruments(exchange=exchange)
-    
+
     def fetch_instruments(self, exchange):
         for instrument in self.kite.instruments(exchange):
             self.instruments[instrument["tradingsymbol"]] = instrument
-    
+
     def get_fo_instrument(self, symbol, expiry, strike_price, option_type):
         for instrument in self.instruments_list:
-            #print(f'ins nm: {instrument["name"]} ex: {instrument["expiry"]}, seg: {instrument["segment"]}, st: {instrument["strike"]} t: {instrument["instrument_type"]}')
-            if instrument["name"] == symbol and instrument["expiry"] == expiry and instrument["segment"] == "NFO-OPT" and instrument["strike"] == strike_price and instrument["instrument_type"] == f"{option_type}E":
+            # print(f'ins nm: {instrument["name"]} ex: {instrument["expiry"]}, seg: {instrument["segment"]}, st: {instrument["strike"]} t: {instrument["instrument_type"]}')
+            if (
+                instrument["name"] == symbol
+                and instrument["expiry"] == expiry
+                and instrument["segment"] == "NFO-OPT"
+                and instrument["strike"] == strike_price
+                and instrument["instrument_type"] == f"{option_type}E"
+            ):
                 return instrument
 
     def get_ft_instrument(self, symbol, expiry):
         for instrument in self.instruments_list:
-            #print(f'ins nm: {instrument["name"]} ex: {instrument["expiry"]}, seg: {instrument["segment"]}, st: {instrument["strike"]} t: {instrument["instrument_type"]}')
-            if instrument["name"] == symbol and instrument["expiry"] == expiry and instrument["segment"] == "NFO-FUT":
+            # print(f'ins nm: {instrument["name"]} ex: {instrument["expiry"]}, seg: {instrument["segment"]}, st: {instrument["strike"]} t: {instrument["instrument_type"]}')
+            if (
+                instrument["name"] == symbol
+                and instrument["expiry"] == expiry
+                and instrument["segment"] == "NFO-FUT"
+            ):
+                return instrument
+
+    def get_ft_instrument_from_it(self, instrument_token):
+        for instrument in self.instruments_list:
+            if instrument["instrument_token"] == instrument_token:
                 return instrument
 
     def get_nse_instrument_token(self, symbol):
@@ -72,19 +87,22 @@ class KiteUtil:
 
     def fetch_access_token(self):
         chrome_options = Options()
-        chrome_options.add_argument('--user-data-dir=./user-data/')
+        chrome_options.add_argument("--user-data-dir=./user-data/")
         with webdriver.Chrome(options=chrome_options) as driver:
             driver.get(self.kite.login_url())
             while "nitinsuresh.me" not in driver.current_url:
                 sleep(1)
-            request_token = self.get_params(driver.current_url, "request_token")
-            data = self.kite.generate_session(request_token, api_secret=config.KITE_SECRET)
+            request_token = self.get_params(
+                driver.current_url, "request_token")
+            data = self.kite.generate_session(
+                request_token, api_secret=config.KITE_SECRET
+            )
         return data["access_token"]
 
     def set_access_token(self):
         success = False
         if os.path.exists(self.ACCESS_TOKEN_FILE):
-            with open(self.ACCESS_TOKEN_FILE, 'r') as f:
+            with open(self.ACCESS_TOKEN_FILE, "r") as f:
                 access_token = f.read()
             self.kite.set_access_token(access_token)
             try:
@@ -97,7 +115,7 @@ class KiteUtil:
             if success:
                 return access_token
         access_token = self.fetch_access_token()
-        with open(self.ACCESS_TOKEN_FILE, 'w') as f:
+        with open(self.ACCESS_TOKEN_FILE, "w") as f:
             f.write(access_token)
         self.kite.set_access_token(access_token)
         return access_token
@@ -108,55 +126,82 @@ class KiteUtil:
         params = parse_qs(query_string)
         return params.get(param_name)[0]
 
-    def fetch_stock_data(self, symbol: str, from_date: datetime, to_date: datetime, interval) -> None:
-        logger.info(f"requesting {symbol}, interval: {interval}, from: {from_date}, to: {to_date}")
+    def fetch_stock_data(
+        self, symbol: str, from_date: datetime, to_date: datetime, interval
+    ) -> None:
+        logger.info(
+            f"requesting {symbol}, interval: {
+                interval}, from: {from_date}, to: {to_date}"
+        )
         try:
-            data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, interval)
+            data = self.kite.historical_data(
+                self.instruments[symbol]["instrument_token"],
+                from_date,
+                to_date,
+                interval,
+            )
         except Exception as e:
             logger.error(e)
             sleep(round(4 * random.random()))
-            data = self.kite.historical_data(self.instruments[symbol]["instrument_token"], from_date, to_date, interval)
+            data = self.kite.historical_data(
+                self.instruments[symbol]["instrument_token"],
+                from_date,
+                to_date,
+                interval,
+            )
         return data
 
-    def fetch_stock_data_it(self, instrument_token: str, from_date: datetime, to_date: datetime, interval) -> None: # Using instrument token
-        logger.info(f"requesting {instrument_token}, interval: {interval}, from: {from_date}, to: {to_date}")
+    def fetch_stock_data_it(
+        self, instrument_token: str, from_date: datetime, to_date: datetime, interval
+    ) -> None:  # Using instrument token
+        logger.info(
+            f"requesting {instrument_token}, interval: {
+                interval}, from: {from_date}, to: {to_date}"
+        )
         try:
-            data = self.kite.historical_data(instrument_token, from_date, to_date, interval)
+            data = self.kite.historical_data(
+                instrument_token, from_date, to_date, interval
+            )
         except Exception as e:
             logger.error(e)
             sleep(round(4 * random.random()))
-            data = self.kite.historical_data(instrument_token, from_date, to_date, interval)
+            data = self.kite.historical_data(
+                instrument_token, from_date, to_date, interval
+            )
         return data
 
     @staticmethod
     def get_file_path(symbol: str, date: datetime, exchange, interval) -> str:
         if interval != INTERVAL_DAY:
-            return f"data/{symbol}/{exchange}/{interval}/{date.strftime('%Y-%m-%d')}.csv"
+            return f"data/{symbol}/{exchange}/{interval}/{
+                date.strftime('%Y-%m-%d')}.csv"
         else:
             return f"data/{symbol}/{exchange}/{interval}/{date.strftime('%Y')}.csv"
 
     def fetch_nifty_data(self, interval) -> None:
-        symbols = [symbol for symbol in self.instruments.keys() if symbol.startswith("NIFTY")]
+        symbols = [
+            symbol for symbol in self.instruments.keys() if symbol.startswith("NIFTY")
+        ]
         self.fetch_bulk_data(symbols, interval)
 
     def place_order(self, trading_symbol, transaction_type, quantity, limit_price, tag):
         order_details = {
-                            "variety": KiteConnect.VARIETY_REGULAR,
-                            "exchange": KiteConnect.EXCHANGE_NFO,
-                            "tradingsymbol": trading_symbol,
-                            "transaction_type": transaction_type,
-                            "quantity": quantity,
-                            "product": KiteConnect.PRODOCT_MIS,
-                            "order_type": KiteConnect.ORDER_TYPE_LIMIT,
-                            "price": limit_price,
-                            "validity": KiteConnect.VARIETY_TTL,
-                            "validity_ttl": 1,
-                            "disclosed_quantity": math.ceil(pc.BUY_QUANTITY * .31),
-                            # "trigger_price": "",
-                            "tag": tag,
-                        }
+            "variety": KiteConnect.VARIETY_REGULAR,
+            "exchange": KiteConnect.EXCHANGE_NFO,
+            "tradingsymbol": trading_symbol,
+            "transaction_type": transaction_type,
+            "quantity": quantity,
+            "product": KiteConnect.PRODOCT_MIS,
+            "order_type": KiteConnect.ORDER_TYPE_LIMIT,
+            "price": limit_price,
+            "validity": KiteConnect.VARIETY_TTL,
+            "validity_ttl": 1,
+            "disclosed_quantity": math.ceil(pc.BUY_QUANTITY * 0.31),
+            # "trigger_price": "",
+            "tag": tag,
+        }
 
-        order_id = self.kite.place_order(**order_details) 
+        order_id = self.kite.place_order(**order_details)
         logger.info("Order placed. ID is: {}".format(order_id))
         return order_id
 
@@ -164,43 +209,75 @@ class KiteUtil:
         today = datetime.now()
         removed = 0
         for symbol in symbols:
-            current_from_date = datetime.strptime(config.DATE_START, "%Y-%m-%d")
+            current_from_date = datetime.strptime(
+                config.DATE_START, "%Y-%m-%d")
             while current_from_date < today:
                 if interval == INTERVAL_DAY:
-                    cur_to_date = current_from_date.replace(year=current_from_date.year + 1)
+                    cur_to_date = current_from_date.replace(
+                        year=current_from_date.year + 1
+                    )
                 else:
-                    cur_to_date = current_from_date + timedelta(days=MAX_PERIOD[interval])
-                file_path = self.get_file_path(symbol, current_from_date, exchange="NSE", interval=interval)
+                    cur_to_date = current_from_date + timedelta(
+                        days=MAX_PERIOD[interval]
+                    )
+                file_path = self.get_file_path(
+                    symbol, current_from_date, exchange="NSE", interval=interval
+                )
                 if not os.path.exists(file_path):
-                    data = self.fetch_stock_data(symbol, current_from_date, cur_to_date, interval)
+                    data = self.fetch_stock_data(
+                        symbol, current_from_date, cur_to_date, interval
+                    )
                     df = pd.DataFrame(data)
                     if df.shape[0] != 0:
                         df.set_index("date", inplace=True)
                         if interval != INTERVAL_DAY:
-                            while current_from_date < cur_to_date and current_from_date < today:
-                                cur_date_df = df[df.index.date == current_from_date.date()]
-                                file_path = self.get_file_path(symbol, current_from_date.date(), exchange="NSE", interval=interval)
+                            while (
+                                current_from_date < cur_to_date
+                                and current_from_date < today
+                            ):
+                                cur_date_df = df[
+                                    df.index.date == current_from_date.date()
+                                ]
+                                file_path = self.get_file_path(
+                                    symbol,
+                                    current_from_date.date(),
+                                    exchange="NSE",
+                                    interval=interval,
+                                )
                                 try:
                                     cur_date_df.to_csv(file_path)
                                 except OSError:
-                                    os.makedirs(file_path.rsplit('/', 1)[0])
+                                    os.makedirs(file_path.rsplit("/", 1)[0])
                                     cur_date_df.to_csv(file_path)
                                 current_from_date += timedelta(days=1)
                         else:
-                            file_path = self.get_file_path(symbol, current_from_date.date(), exchange="NSE", interval=interval)
+                            file_path = self.get_file_path(
+                                symbol,
+                                current_from_date.date(),
+                                exchange="NSE",
+                                interval=interval,
+                            )
                             try:
                                 df.to_csv(file_path)
                             except OSError:
-                                os.makedirs(file_path.rsplit('/', 1)[0])
+                                os.makedirs(file_path.rsplit("/", 1)[0])
                                 df.to_csv(file_path)
                             current_from_date = cur_to_date
                     else:
-                        while current_from_date < cur_to_date and current_from_date < today:
-                            file_path = self.get_file_path(symbol, current_from_date.date(), exchange="NSE", interval=interval)
+                        while (
+                            current_from_date < cur_to_date
+                            and current_from_date < today
+                        ):
+                            file_path = self.get_file_path(
+                                symbol,
+                                current_from_date.date(),
+                                exchange="NSE",
+                                interval=interval,
+                            )
                             try:
                                 df.to_csv(file_path)
                             except OSError:
-                                os.makedirs(file_path.rsplit('/', 1)[0])
+                                os.makedirs(file_path.rsplit("/", 1)[0])
                                 df.to_csv(file_path)
                             current_from_date += timedelta(days=1)
                         current_from_date = cur_to_date
@@ -222,29 +299,31 @@ if __name__ == "__main__":
     offset = 0
     limit = len(config.option_stocks)
     all_symbols = config.option_stocks
-    nifty_symbols = [symbol for symbol in x.instruments.keys() if symbol.startswith("NIFTY")]
+    nifty_symbols = [
+        symbol for symbol in x.instruments.keys() if symbol.startswith("NIFTY")
+    ]
     all_symbols = all_symbols + nifty_symbols
     for interval in ALL_INTERVALS:
         print(interval)
         while offset < limit:
-            stocks = all_symbols[offset : offset+limit//splits]
-            thread = threading.Thread(target=x.fetch_bulk_data, args=(stocks, interval))
+            stocks = all_symbols[offset: offset + limit // splits]
+            thread = threading.Thread(
+                target=x.fetch_bulk_data, args=(stocks, interval))
             threadpool.append(thread)
             thread.start()
-            offset += limit//splits
+            offset += limit // splits
         for thread in threadpool:
             thread.join()
         offset = 0
-    #print(x.instruments.keys())
-    #x.fetch_data(INTERVAL_MIN10)
-    #x.fetch_nifty_data()
-    #x.fetch_nifty_data(interval=INTERVAL_MIN15)
-    #x.fetch_nifty_data(interval=INTERVAL_MIN10)
-    #x.fetch_nifty_data(interval=INTERVAL_DAY)
-    #from_date_str = "2023-07-01"
-    #from_date_dt = datetime.strptime(from_date_str, "%Y-%m-%d")
-    #period = 365 * 15
-    #to_date = from_date_dt + timedelta(days=period)
+    # print(x.instruments.keys())
+    # x.fetch_data(INTERVAL_MIN10)
+    # x.fetch_nifty_data()
+    # x.fetch_nifty_data(interval=INTERVAL_MIN15)
+    # x.fetch_nifty_data(interval=INTERVAL_MIN10)
+    # x.fetch_nifty_data(interval=INTERVAL_DAY)
+    # from_date_str = "2023-07-01"
+    # from_date_dt = datetime.strptime(from_date_str, "%Y-%m-%d")
+    # period = 365 * 15
+    # to_date = from_date_dt + timedelta(days=period)
 
-
-    #print(x.fetch_stock_data("RELIANCE", from_date=from_date_dt, to_date=to_date, interval=INTERVAL_DAY,))
+    # print(x.fetch_stock_data("RELIANCE", from_date=from_date_dt, to_date=to_date, interval=INTERVAL_DAY,))

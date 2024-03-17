@@ -15,6 +15,7 @@ logger.info("Start trading")
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 
+
 ku = hd.KiteUtil(exchange=EXCHANGE_NFO)
 
 def convert_float(num):
