@@ -1,19 +1,25 @@
-import os
-from bokeh.plotting import figure
-from bokeh.palettes import Category10
-from bokeh.io import show, output_notebook
-from bokeh.models import CrosshairTool, Range1d, LabelSet, WheelZoomTool, HoverTool
-from base import OrderManager
-from historical_data import KiteUtil
-import pandas as pd
 import datetime as dt
-import icharts as ic
-from icharts_config import expiries
-from constants import *
-from pytz import timezone  # For timezone handling
-import numpy as np
-from logger_settings import logger
 import heapq
+import os
+
+import pandas as pd
+from bokeh.io import output_notebook, show
+from bokeh.models import (
+    CrosshairTool,
+    HoverTool,
+    LabelSet,
+    WheelZoomTool,
+    ColumnDataSource,
+)
+from bokeh.palettes import Category10
+from bokeh.plotting import figure
+
+import icharts as ic
+from base import OrderManager
+from constants import *
+from historical_data import KiteUtil
+from icharts_config import expiries
+from logger_settings import logger
 
 
 class MaxHeap:
@@ -167,8 +173,7 @@ def build_date_range(date_start, date_end, symbol, interval, exchange):
     cur_date = date_start
     while cur_date < date_end:
         if cur_date.weekday() not in [5, 6]:
-            hd, _ = has_data(symbol, cur_date,
-                             interval=interval, exchange=exchange)
+            hd, _ = has_data(symbol, cur_date, interval=interval, exchange=exchange)
             if hd:
                 date_range.append(cur_date)
         cur_date += dt.timedelta(days=1)
@@ -260,6 +265,7 @@ def bokeh_plot(
             ("volume", "@volume{0.00 a}"),
             ("oi", "@oi{0.00000 a}"),
             (index_field, f"@{index_field}"),
+            ("index", "@index"),
             ("(x,y)", "($x{int}, $y)"),
         ],
         formatters={
@@ -293,14 +299,12 @@ def draw_sub_plot(p, subplots, subplot_labels):
 
 def draw_sub_multiline_plot(p, cds):
     p.multi_line(xs="xs", ys="ys", line_width=2, color="orange", source=cds)
-    label_set = LabelSet(x="x", y="y", text="texts",
-                         x_offset=5, y_offset=5, source=cds)
+    label_set = LabelSet(x="x", y="y", text="texts", x_offset=5, y_offset=5, source=cds)
     p.add_layout(label_set)
 
 
 def get_price_at(symbol, d, t, interval, exchange, get_open=True):
-    data = get_data(symbol=symbol, date=d,
-                    interval=interval, exchange=exchange)
+    data = get_data(symbol=symbol, date=d, interval=interval, exchange=exchange)
     try:
         if get_open:
             return data.loc[data.index.time == t].iloc[0].open
@@ -308,7 +312,7 @@ def get_price_at(symbol, d, t, interval, exchange, get_open=True):
             return data.loc[data.index.time == t].iloc[0].close
     except IndexError:
         return pd.NA
-    except AttributeError as e:
+    except AttributeError:
         return pd.NA
 
 
@@ -332,8 +336,7 @@ def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
 
 def add_to_time(time, minutes):
     return (
-        dt.datetime.combine(dt.datetime.now(), time) +
-        dt.timedelta(minutes=minutes)
+        dt.datetime.combine(dt.datetime.now(), time) + dt.timedelta(minutes=minutes)
     ).time()
 
 
@@ -388,10 +391,49 @@ def get_ticks(symbol, expiry, strike, otype, date):
     tdf["volume"] = tdf.volume_traded - tdf.volume_traded.shift(1)
     tdf.drop("volume_traded", inplace=True, axis=1)
     tdf.fillna({"volume": 0}, inplace=True)
-    tdf["id"] = (tdf.last_trade_time -
-                 tdf.iloc[0].last_trade_time).dt.total_seconds()
+    tdf["id"] = (tdf.last_trade_time - tdf.iloc[0].last_trade_time).dt.total_seconds()
     tdf["id"] = pd.to_numeric(tdf["id"], downcast="integer")
     return tdf
+
+
+def bokeh_series_plot(df, y_name, x_name):
+    output_notebook()
+    source = ColumnDataSource(df)
+    p = figure(
+        title="Pandas Series Line Graph",
+        x_axis_label=x_name,
+        y_axis_label=y_name,
+        min_width=2100,
+        min_height=1000,
+    )
+    p.line(
+        x=x_name, y=y_name, source=source, line_width=2
+    )  # Adjust line_width as needed
+    crosshair_tool = CrosshairTool(
+        dimensions="both",
+        line_color="red",
+        line_alpha=0.8,
+    )
+    p.add_tools(crosshair_tool)
+    p.toolbar.active_scroll = p.select_one(WheelZoomTool)
+    p.xaxis.ticker.desired_num_ticks = 40  # Tick every 5 minutes
+    hvt = HoverTool(
+        tooltips=[
+            (y_name, f"@{y_name}"),
+            (x_name, f"@{x_name}"),
+            ("index", "@index"),
+            ("(x,y)", "($x{int}, $y)"),
+        ],
+        formatters={
+            "@last_trade_time": "datetime",  # use 'datetime' formatter for '@date' field
+            # use 'printf' formatter for '@{adj close}' field
+            "@{last_price}": "printf",
+        },
+        # display a tooltip whenever the cursor is vertically in line with a glyph
+        mode="vline",
+    )
+    p.add_tools(hvt)
+    show(p)
 
 
 class ZerodhaOrderManager(OrderManager):

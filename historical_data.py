@@ -82,7 +82,7 @@ class KiteUtil:
 
     def get_nse_instrument_token(self, symbol):
         for instrument in self.kite.instruments(exchange=EXCHANGE_NSE):
-            if instrument["name"] == symbol:
+            if instrument["tradingsymbol"] == symbol:
                 return instrument["instrument_token"]
 
     def fetch_access_token(self):
