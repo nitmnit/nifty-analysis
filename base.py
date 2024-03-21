@@ -42,6 +42,7 @@ class BasePhase:
         self.direction = None
         self.type = self.TYPE_CONT
         self.initiated_at = initiated_at
+        self.resumed_at = initiated_at
         self.ended_at = strategy.ticks.iloc[-1].name
         self.confirmed_at = None
         self.rejected_at = None
@@ -57,11 +58,11 @@ class BasePhase:
 
     def next(self):
         self.ended_at = self.strategy.ticks.iloc[-1].name
-        self.pticks = self.strategy.ticks.loc[self.initiated_at:].copy()
+        self.pticks = self.strategy.ticks.loc[self.resumed_at:].copy()
 
     @property
     def length(self):
-        return self.ended_at - self.initiated_at
+        return self.ended_at - self.resumed_at
 
     def __repr__(self):
         return f"Phase {self.id}:{self.direction}, {self.status} I:{self.initiated_at}, C:{self.confirmed_at} R:{self.retraced_at}, T:{self.term_at}, RJ:{self.rejected_at}, cr:{self.created_at} tr: {self.term_reason}, rr:{self.retrace_reason}, end:{self.ended_at}"
@@ -102,17 +103,28 @@ class Order:
     @property
     def pnl(self):
         if self.square_off_price is None:
-            return "NA"
-        profit = self.quantity * round(self.square_off_price - self.limit_price, 2)
+            return
+        profit = self.quantity * \
+            round(self.square_off_price - self.limit_price, 2)
         if self.type == Order.TYPE_BUY:
             return profit
         return -profit
+
+    @property
+    def pnl_pc(self):
+        if self.square_off_price is None:
+            return
+        pc_profit = (self.square_off_price - self.limit_price) * \
+            100 / self.limit_price
+        if self.type == Order.TYPE_BUY:
+            return pc_profit
+        return -pc_profit
 
     def __str__(self):
         return self.__repr__()
 
     def __repr__(self):
-        return f"{self.type}, b:{self.limit_price}, s:{self.square_off_price}, pnl:{self.pnl}"
+        return f"{self.type}, b:{self.limit_price}, s:{self.square_off_price}, pnl:{self.pnl_pc}"
 
 
 class PhaseOrder:
