@@ -130,8 +130,7 @@ class KiteUtil:
         self, symbol: str, from_date: datetime, to_date: datetime, interval
     ) -> None:
         logger.info(
-            f"requesting {symbol}, interval: {
-                interval}, from: {from_date}, to: {to_date}"
+            f"requesting {symbol}, interval: {interval}, from: {from_date}, to: {to_date}"
         )
         try:
             data = self.kite.historical_data(
