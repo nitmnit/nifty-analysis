@@ -37,7 +37,7 @@ class BasePhase:
     ID = 0
     ONGOING_STATUS = [STATUS_INITIATED, STATUS_CONFIRMED]
 
-    def __init__(self, initiated_at, strategy):
+    def __init__(self, initiated_at, strategy, previous_phase):
         self.status = self.STATUS_INITIATED
         self.direction = None
         self.type = self.TYPE_CONT
@@ -49,16 +49,19 @@ class BasePhase:
         self.term_at = None  # Terminated at
         self.retraced_at = None
         self.strategy = strategy
+        self.previous_phase = previous_phase
         self.created_at = strategy.ticks.iloc[-1].name
         self.id = BasePhase.ID
         self.term_reason = None
         self.retrace_reason = None
         BasePhase.ID += 1
-        self.pticks: pd.DataFrame | None = None
+        self.pticks: pd.DataFrame | None = None  # Phase ticks since last resumed_at
+        self.aticks: pd.DataFrame | None = None  # All phase ticks
 
     def next(self):
         self.ended_at = self.strategy.ticks.iloc[-1].name
         self.pticks = self.strategy.ticks.loc[self.resumed_at:].copy()
+        self.aticks = self.strategy.ticks.loc[self.initiated_at:].copy()
 
     @property
     def length(self):
@@ -154,7 +157,6 @@ class OrderManager:
         self.orders.append(order)
 
     def has_intrade_orders(self, phase=None) -> bool:
-        logger.info("has_intrade_orders called")
         if phase is None:
             return len(self.orders) > 0
         for po in self.orders:
