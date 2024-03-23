@@ -4,7 +4,9 @@ import datetime as dt
 # Configure logging
 log_format = "%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - [%(thread)d] - \n%(message)s"
 logging.basicConfig(
-    level=logging.INFO, format=log_format
+    # level=logging.ERROR, format=log_format
+    level=logging.INFO,
+    format=log_format,
 )
 
 # Create a file handler and set the logging level

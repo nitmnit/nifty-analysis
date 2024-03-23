@@ -127,7 +127,7 @@ class Order:
         return self.__repr__()
 
     def __repr__(self):
-        return f"{self.type}, b:{self.limit_price}, s:{self.square_off_price}, pnl:{self.pnl_pc}"
+        return f"{self.type}, at:{self.created_at}, b:{self.limit_price}, sqat:{self.square_off_at}, s:{self.square_off_price}, pnl:{self.pnl_pc}"
 
 
 class PhaseOrder:
