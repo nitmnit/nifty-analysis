@@ -1,4 +1,5 @@
 import datetime as dt
+import requests
 import heapq
 import os
 
@@ -21,6 +22,8 @@ from historical_data import KiteUtil
 from icharts_config import expiries
 from logger_settings import logger
 
+
+#output_notebook()
 
 class MaxHeap:
     def __init__(self, max_size):
@@ -319,8 +322,27 @@ def get_price_at(symbol, d, t, interval, exchange, get_open=True):
         return pd.NA
 
 
+def is_file_old(file_path, days=7):
+    if os.path.exists(file_path):
+        modified_time = dt.datetime.fromtimestamp(os.path.getmtime(file_path))
+        return dt.datetime.now() - modified_time >= dt.timedelta(days=days)
+    return False
+
+def download_and_replace(url, file_path):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(file_path, 'wb') as file:
+            file.write(response.content)
+        return True
+    else:
+        print("Failed to download file from URL:", url)
+        return False
+
 def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
-    df = pd.read_csv("api-scrip-master.csv")
+    file_path = 'api-scrip-master.csv'
+    if is_file_old(file_path):
+        download_and_replace(url="https://images.dhan.co/api-data/api-scrip-master.csv", file_path=file_path)
+    df = pd.read_csv(file_path)
     otype = CE if option_type == OPTION_TYPE_CALL else PE
     df["SEM_EXPIRY_DATE"] = pd.to_datetime(df["SEM_EXPIRY_DATE"])
     match = df.loc[

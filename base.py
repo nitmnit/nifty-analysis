@@ -152,26 +152,19 @@ class OrderManager:
         self.closed_orders = []
 
     def place_order(self, order):
-        logger.info("place_order called")
-        order.order.status = Order.STATUS_INTRADE
+        logger.info(f"place_order called at: {order.created_at}")
+        order.status = Order.STATUS_INTRADE
         self.orders.append(order)
 
     def has_intrade_orders(self, phase=None) -> bool:
-        if phase is None:
-            return len(self.orders) > 0
-        for po in self.orders:
-            if po.phase.id == phase.id:
-                return True
-        return False
+        return len(self.orders) != 0
 
-    def square_off_all_orders(self, index, last_price, phase):
-        for i in range(len(self.orders) - 1, -1, -1):
-            order = self.orders[i]
-            if order.phase.id == phase.id:
-                order.order.square_off(last_price, index)
-                logger.info(f"squared off {order.order}")
-                self.closed_orders.append(order)
-                del self.orders[i]
+    def square_off_all_orders(self, last_price, index):
+        for order in self.orders:
+            order.square_off(last_price, index)
+            logger.info(f"squared off {order}")
+            self.closed_orders.append(order)
+        self.orders = []
 
 
 class BasePhaseStrategy(Strategy):
@@ -201,3 +194,8 @@ class BasePhaseStrategy(Strategy):
 
     def on_ongoing(self, phase):
         pass
+
+
+class Factor:
+    pass
+
