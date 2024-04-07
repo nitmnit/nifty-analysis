@@ -9,7 +9,7 @@ access_token = config.DHAN_ACCESS_TOKEN
 
 # Maximum 100 instruments can be subscribed, then use 'subscribe_symbols' function 
 
-instruments = [(1, "1333"),(0,"13")]
+instruments = [(1, "1333"),(0,"13"), (2, "38981")]
 
 # Type of data subscription
 subscription_code = marketfeed.Ticker

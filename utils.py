@@ -24,6 +24,24 @@ from logger_settings import logger
 
 
 #output_notebook()
+file_path = 'api-scrip-master.csv'
+scrip_df = pd.read_csv(file_path)
+
+
+def convert_float(num):
+    num = round(num, 2)  # Ensure the number has 2 decimal places
+    integer_part = int(num)
+    decimal_part = int(10 * (num - integer_part))
+    last_digit = int(10 * (10 * (num - integer_part) - decimal_part))
+    # If the last digit is less than 5, make it 0. Otherwise, make it 5.
+    if last_digit < 5:
+        last_digit = 0
+    else:
+        last_digit = 5
+    # Construct the new number
+    new_num = integer_part + decimal_part / 10 + last_digit / 100
+    return round(new_num, 2)
+
 
 class MaxHeap:
     def __init__(self, max_size):
@@ -339,21 +357,21 @@ def download_and_replace(url, file_path):
         return False
 
 def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
-    file_path = 'api-scrip-master.csv'
+    global scrip_df
     if is_file_old(file_path):
         download_and_replace(url="https://images.dhan.co/api-data/api-scrip-master.csv", file_path=file_path)
-    df = pd.read_csv(file_path)
+        scrip_df = pd.read_csv(file_path)
     otype = CE if option_type == OPTION_TYPE_CALL else PE
-    df["SEM_EXPIRY_DATE"] = pd.to_datetime(df["SEM_EXPIRY_DATE"])
-    match = df.loc[
-        (df.SEM_EXPIRY_DATE.dt.date == expiry)
-        & (df.SEM_STRIKE_PRICE == strike)
-        & (df.SEM_OPTION_TYPE == otype)
-        & (df.SEM_TRADING_SYMBOL.str.startswith(symbol))
-        & (df.SEM_EXM_EXCH_ID == exchange)
+    scrip_df["SEM_EXPIRY_DATE"] = pd.to_datetime(scrip_df["SEM_EXPIRY_DATE"])
+    match = scrip_df.loc[
+        (scrip_df.SEM_EXPIRY_DATE.dt.date == expiry)
+        & (scrip_df.SEM_STRIKE_PRICE == strike)
+        & (scrip_df.SEM_OPTION_TYPE == otype)
+        & (scrip_df.SEM_TRADING_SYMBOL.str.startswith(symbol))
+        & (scrip_df.SEM_EXM_EXCH_ID == exchange)
     ]
     if match.shape[0] > 1:
-        raise Exception(f"more than one match found {df}")
+        raise Exception(f"more than one match found {scrip_df}")
     if match.empty:
         return pd.NA
     return match.iloc[0].to_dict()
@@ -462,6 +480,12 @@ def bokeh_series_plot(df, y_name, x_name):
     p.add_tools(hvt)
     show(p)
 
+def next_thursday():
+    today = dt.date.today()
+    # Calculate days until next Thursday (Thursday is weekday 3)
+    days_ahead = (3 - today.weekday() + 7) % 7
+    next_thursday_date = today + dt.timedelta(days=days_ahead)
+    return next_thursday_date
 
 class ZerodhaOrderManager(OrderManager):
     def __init__(self):

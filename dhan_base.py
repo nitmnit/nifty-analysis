@@ -1,5 +1,5 @@
 def get_instrument_file_name(instrument):
-    return f"{instrument["SEM_SMST_SECURITY_ID"]}.txt"
+    return f"{instrument["SEM_TRADING_SYMBOL"]}.ltp"
 
 
 def get_instrument_ltp(instrument):
