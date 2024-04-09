@@ -8,6 +8,7 @@ DHAN_CLIENT_ID = ""
 DHAN_ACCESS_TOKEN = ""
 
 DATE_START = "2010-01-01"
+DIRECTION_REDIS_KEY = "vol_market_direction"
 
 option_stocks = [
     "AARTIIND",

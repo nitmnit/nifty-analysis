@@ -13,3 +13,4 @@ dhanhq
 jedi-language-server
 websockets
 TA-Lib
+redis
