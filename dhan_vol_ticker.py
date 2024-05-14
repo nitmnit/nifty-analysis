@@ -76,7 +76,7 @@ async def on_message(instance, message):
         print(f"None of the call or puts: {message}")
         return
     if CUR_STATE == TRADE_COOL_DOWN:
-        positions = cfg.get_open_positions(position_type='long')
+        positions = cfg.get_open_positions(position_type='short')
         if len(positions) == 0:
             CUR_STATE = NO_TRADE
             cfg.success += 1
@@ -109,7 +109,7 @@ async def on_message(instance, message):
             CUR_STATE = NO_TRADE
     elif CUR_STATE == IN_TRADE:
         # Check if SL is hit or if target is hit, change state to NO_TRADE
-        positions = cfg.get_open_positions(position_type='long')
+        positions = cfg.get_open_positions(position_type='short')
         if len(positions) == 0:
             CUR_STATE = NO_TRADE
             cfg.success += 1
@@ -119,18 +119,19 @@ async def on_message(instance, message):
             return
         elif otype == PUT and positions[0]["drvOptionType"] == CALL:
             return
+        cur_dir = r.get(config.DIRECTION_REDIS_KEY)
         if otype == CALL:
-            r.set(config.DIRECTION_REDIS_KEY, "stag")
+            # r.set(config.DIRECTION_REDIS_KEY, "stag")
             # if len(instance.cticks) >= 60 and min(instance.cticks[-60:]) >= ltp:
             # Trigger stop loss
-            if ltp <= cfg.call_od["price"]:
+            if (cur_dir == "down" or cur_dir == "stag") and ltp <= cfg.call_od["price"]:
                 cfg.square_off_call(ltp=ltp)
             # r.set(config.DIRECTION_REDIS_KEY, "down")
         elif otype == PUT:
-            r.set(config.DIRECTION_REDIS_KEY, "stag")
+            # r.set(config.DIRECTION_REDIS_KEY, "stag")
             # if len(instance.pticks) >= 60 and min(instance.pticks[-60:]) >= ltp:
             # Trigger stop loss
-            if ltp <= cfg.put_od["price"]:
+            if (cur_dir == "up" or cur_dir == "stag") and ltp <= cfg.put_od["price"]:
                 cfg.square_off_put(ltp=ltp)
             # r.set(config.DIRECTION_REDIS_KEY, "up")
     else:

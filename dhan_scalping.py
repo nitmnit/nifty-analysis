@@ -125,12 +125,13 @@ class Config:
         print(f"od: {buy_order_details}")
         od = buy_order_details.copy()
         od["transaction_type"] = dhan.SELL
+        od["transaction_type"] = dhan.BUY
         if od["drv_options_type"] == "CALL":
-            od["price"] = ut.convert_float(od["price"] * (1 + self.call_tp / 100))
+            od["price"] = ut.convert_float(od["price"] * (1 - self.call_tp / 100))
             self.call_sell_order = dhan.place_order(**od)
             print(self.call_sell_order)
         elif od["drv_options_type"] == "PUT":
-            od["price"] = ut.convert_float(od["price"] * (1 + self.put_tp / 100))
+            od["price"] = ut.convert_float(od["price"] * (1 - self.put_tp / 100))
             self.put_sell_order = dhan.place_order(**od)
             print(self.put_sell_order)
         else:
@@ -184,7 +185,8 @@ class Config:
         order_details = {
             "security_id": str(instrument["SEM_SMST_SECURITY_ID"]),
             "exchange_segment": dhan.NSE_FNO,
-            "transaction_type": dhan.BUY,
+            # "transaction_type": dhan.BUY,
+            "transaction_type": dhan.SELL,
             "quantity": quantity,
             "order_type": dhan.LIMIT,
             "product_type": dhan.MARGIN,
@@ -257,7 +259,8 @@ class Config:
         if orders is None or "data" not in orders or len(orders["data"]) == 0:
             return
         for order in orders["data"]:
-            if order["orderStatus"] == "PENDING" and order["transactionType"] == "SELL":
+            # if order["orderStatus"] == "PENDING" and order["transactionType"] == "SELL":
+            if order["orderStatus"] == "PENDING" and order["transactionType"] == "BUY":
                 return order
 
 

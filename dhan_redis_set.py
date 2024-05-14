@@ -23,10 +23,10 @@ while True:
     win = curses.initscr()
     c = chr(win.getch())
     if c == 'k':
-        r.set(config.DIRECTION_REDIS_KEY, "up")
+        r.set(config.DIRECTION_REDIS_KEY, "down")
         print("setting up")
     elif c == 'j':
-        r.set(config.DIRECTION_REDIS_KEY, "down")
+        r.set(config.DIRECTION_REDIS_KEY, "up")
         print("setting down")
     elif c == 'l':
         r.set(config.DIRECTION_REDIS_KEY, "stag")
