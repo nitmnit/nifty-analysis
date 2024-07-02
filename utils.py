@@ -72,8 +72,7 @@ def ct(fn):
         res = fn(*args, **kwargs)
         t2 = dt.datetime.now()
         logger.info(
-            f"time taken by {__name__}: {
-                round((t2-t1).total_seconds(), 2)} seconds"
+            f"time taken by {__name__}: {round((t2-t1).total_seconds(), 2)} seconds"
         )
         return res
 
@@ -99,8 +98,7 @@ def has_data(symbol, candle_timestamp, interval, exchange):
             df = df.loc[df.index.date == get_date(candle_timestamp)]
     except FileNotFoundError:
         logger.info(
-            f"file not found symbol: {symbol} on date: {
-                candle_timestamp}, file_path: {file_path}"
+            f"file not found symbol: {symbol} on date: {candle_timestamp}, file_path: {file_path}"
         )
         return False, None
     except pd.errors.EmptyDataError:

@@ -130,7 +130,8 @@ class KiteUtil:
         self, symbol: str, from_date: datetime, to_date: datetime, interval
     ) -> None:
         logger.info(
-            f"requesting {symbol}, interval: {interval}, from: {from_date}, to: {to_date}"
+            f"requesting {symbol}, interval: "
+            f"{interval}, from: {from_date}, to: {to_date}"
         )
         try:
             data = self.kite.historical_data(
@@ -154,8 +155,8 @@ class KiteUtil:
         self, instrument_token: str, from_date: datetime, to_date: datetime, interval
     ) -> None:  # Using instrument token
         logger.info(
-            f"requesting {instrument_token}, interval: {
-                interval}, from: {from_date}, to: {to_date}"
+            f"requesting {instrument_token}, interval: "
+            f"{interval}, from: {from_date}, to: {to_date}"
         )
         try:
             data = self.kite.historical_data(
@@ -172,8 +173,9 @@ class KiteUtil:
     @staticmethod
     def get_file_path(symbol: str, date: datetime, exchange, interval) -> str:
         if interval != INTERVAL_DAY:
-            return f"data/{symbol}/{exchange}/{interval}/{
-                date.strftime('%Y-%m-%d')}.csv"
+            return (
+                f"data/{symbol}/{exchange}/{interval}/{date.strftime('%Y-%m-%d')}.csv"
+            )
         else:
             return f"data/{symbol}/{exchange}/{interval}/{date.strftime('%Y')}.csv"
 
