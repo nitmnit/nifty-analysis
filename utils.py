@@ -4,17 +4,28 @@ import heapq
 import os
 
 import pandas as pd
-from bokeh.io import output_notebook, show
-from bokeh.models import (
-    CrosshairTool,
-    HoverTool,
-    LabelSet,
-    WheelZoomTool,
-    ColumnDataSource,
-)
+from bokeh.io import output_notebook, show, curdoc
 from bokeh.palettes import Category10
 from bokeh.plotting import figure
-
+from bokeh.models import (
+    ColumnDataSource,
+    BooleanFilter,
+    CDSView,
+    IndexFilter,
+    CrosshairTool,
+    LabelSet,
+    HoverTool,
+    WheelZoomTool,
+    DatetimeTickFormatter,
+    DatetimeTicker,
+    TickFormatter,
+    CustomJSTickFormatter,
+    Label,
+    CustomJS,
+    NumeralTickFormatter,
+)
+from bokeh.layouts import gridplot
+from bokeh.themes import Theme
 import icharts as ic
 from base import OrderManager
 from constants import *
@@ -23,8 +34,8 @@ from icharts_config import expiries
 from logger_settings import logger
 
 
-#output_notebook()
-file_path = 'api-scrip-master.csv'
+# output_notebook()
+file_path = "api-scrip-master.csv"
 scrip_df = pd.read_csv(file_path)
 
 
@@ -192,8 +203,7 @@ def build_date_range(date_start, date_end, symbol, interval, exchange):
     cur_date = date_start
     while cur_date < date_end:
         if cur_date.weekday() not in [5, 6]:
-            hd, _ = has_data(symbol, cur_date,
-                             interval=interval, exchange=exchange)
+            hd, _ = has_data(symbol, cur_date, interval=interval, exchange=exchange)
             if hd:
                 date_range.append(cur_date)
         cur_date += dt.timedelta(days=1)
@@ -319,14 +329,12 @@ def draw_sub_plot(p, subplots, subplot_labels):
 
 def draw_sub_multiline_plot(p, cds):
     p.multi_line(xs="xs", ys="ys", line_width=2, color="orange", source=cds)
-    label_set = LabelSet(x="x", y="y", text="texts",
-                         x_offset=5, y_offset=5, source=cds)
+    label_set = LabelSet(x="x", y="y", text="texts", x_offset=5, y_offset=5, source=cds)
     p.add_layout(label_set)
 
 
 def get_price_at(symbol, d, t, interval, exchange, get_open=True):
-    data = get_data(symbol=symbol, date=d,
-                    interval=interval, exchange=exchange)
+    data = get_data(symbol=symbol, date=d, interval=interval, exchange=exchange)
     try:
         if get_open:
             return data.loc[data.index.time == t].iloc[0].open
@@ -344,20 +352,25 @@ def is_file_old(file_path, days=7):
         return dt.datetime.now() - modified_time >= dt.timedelta(days=days)
     return False
 
+
 def download_and_replace(url, file_path):
     response = requests.get(url)
     if response.status_code == 200:
-        with open(file_path, 'wb') as file:
+        with open(file_path, "wb") as file:
             file.write(response.content)
         return True
     else:
         print("Failed to download file from URL:", url)
         return False
 
+
 def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
     global scrip_df
     if is_file_old(file_path):
-        download_and_replace(url="https://images.dhan.co/api-data/api-scrip-master.csv", file_path=file_path)
+        download_and_replace(
+            url="https://images.dhan.co/api-data/api-scrip-master.csv",
+            file_path=file_path,
+        )
         scrip_df = pd.read_csv(file_path)
     otype = CE if option_type == OPTION_TYPE_CALL else PE
     scrip_df["SEM_EXPIRY_DATE"] = pd.to_datetime(scrip_df["SEM_EXPIRY_DATE"])
@@ -377,8 +390,7 @@ def get_fo_instrument_details(symbol, expiry, strike, option_type, exchange):
 
 def add_to_time(time, minutes):
     return (
-        dt.datetime.combine(dt.datetime.now(), time) +
-        dt.timedelta(minutes=minutes)
+        dt.datetime.combine(dt.datetime.now(), time) + dt.timedelta(minutes=minutes)
     ).time()
 
 
@@ -433,8 +445,7 @@ def get_ticks(symbol, expiry, strike, otype, date):
     tdf["volume"] = tdf.volume_traded - tdf.volume_traded.shift(1)
     tdf.drop("volume_traded", inplace=True, axis=1)
     tdf.fillna({"volume": 0}, inplace=True)
-    tdf["id"] = (tdf.last_trade_time -
-                 tdf.iloc[0].last_trade_time).dt.total_seconds()
+    tdf["id"] = (tdf.last_trade_time - tdf.iloc[0].last_trade_time).dt.total_seconds()
     tdf["id"] = pd.to_numeric(tdf["id"], downcast="integer")
     return tdf
 
@@ -478,6 +489,7 @@ def bokeh_series_plot(df, y_name, x_name):
     p.add_tools(hvt)
     show(p)
 
+
 def next_thursday():
     today = dt.date.today()
     # Calculate days until next Thursday (Thursday is weekday 3)
@@ -485,6 +497,250 @@ def next_thursday():
     next_thursday_date = today + dt.timedelta(days=days_ahead)
     return next_thursday_date
 
+
 class ZerodhaOrderManager(OrderManager):
     def __init__(self):
         pass
+
+
+def create_candlestick_plot(df):
+    cds = ColumnDataSource(df)
+    green = CDSView(filter=BooleanFilter(df["close"] >= df["open"]))
+    red = CDSView(filter=BooleanFilter(df["close"] < df["open"]))
+    w = 60 * 1000
+    p = figure(
+        x_axis_type="datetime",
+        title=f"Minute Candles",
+        min_width=2000,
+        min_height=900,
+        background_fill_color="#1e1e1e",
+    )
+
+    # Segments for high-low
+    p.segment(
+        x0="date_time",
+        y0="high",
+        x1="date_time",
+        y1="low",
+        color="#26a69a",
+        source=cds,
+        view=green,
+    )
+    p.segment(
+        x0="date_time",
+        y0="high",
+        x1="date_time",
+        y1="low",
+        color="#ef5350",
+        source=cds,
+        view=red,
+    )
+
+    # Bars for open-close
+    p.vbar(
+        x="date_time",
+        width=w,
+        top="open",
+        bottom="close",
+        fill_color="#26a69a",
+        line_color="black",
+        source=cds,
+        view=green,
+    )
+    p.vbar(
+        x="date_time",
+        width=w,
+        top="close",
+        bottom="open",
+        fill_color="#ef5350",
+        line_color="black",
+        source=cds,
+        view=red,
+    )
+
+    p.xaxis.formatter = CustomJSTickFormatter(
+        code="""
+        var date = new Date(tick);
+        var hours = date.getUTCHours();
+        var minutes = date.getUTCMinutes();
+        var suffix = (hours >= 12) ? 'PM' : 'AM';
+        hours = (hours % 12) || 12;
+        minutes = minutes < 10 ? '0' + minutes : minutes;
+        return hours + ':' + minutes;
+    """
+    )
+
+    p.xaxis.ticker = DatetimeTicker(desired_num_ticks=30, num_minor_ticks=5)
+
+    p.grid.grid_line_alpha = 0.3
+
+    crosshair_tool = CrosshairTool(
+        dimensions="both",
+        line_color="red",
+        line_alpha=0.8,
+    )
+    p.add_tools(crosshair_tool)
+    hover = HoverTool(
+        tooltips=[
+            ("Date", "@date_time{%H:%M}"),
+            ("Open", "@open"),
+            ("High", "@high"),
+            ("Low", "@low"),
+            ("Close", "@close"),
+            ("Volume", "@volume{0.0a}"),
+        ],
+        formatters={"@date_time": "datetime"},
+        mode="vline",
+    )
+    p.add_tools(hover)
+    wheel_zoom = WheelZoomTool()
+    p.add_tools(wheel_zoom)
+    p.toolbar.active_scroll = wheel_zoom
+
+    tradingview_theme = Theme(
+        json={
+            "attrs": {
+                "figure": {
+                    "background_fill_color": "#1e1e1e",
+                    "border_fill_color": "#1e1e1e",
+                    "outline_line_color": "#393939",
+                },
+                "Axis": {
+                    "major_label_text_color": "#e0e0e0",
+                    "axis_label_text_color": "#e0e0e0",
+                    "major_tick_line_color": "#393939",
+                    "minor_tick_line_color": "#393939",
+                    "axis_line_color": "#393939",
+                },
+                "Grid": {"grid_line_color": "#393939"},
+            }
+        }
+    )
+
+    # Create labels for crosshair values on the axes
+    x_label = Label(
+        x=0,
+        y=0,
+        x_units="data",
+        y_units="screen",
+        text="",
+        text_color="white",
+        text_font_size="10pt",
+        background_fill_color="#1e1e1e",
+        background_fill_alpha=0.8,
+        text_align="left",
+        text_baseline="bottom",
+    )
+
+    y_label = Label(
+        x=0,
+        y=0,
+        x_units="screen",
+        y_units="data",
+        text="",
+        text_color="white",
+        text_font_size="10pt",
+        background_fill_color="#1e1e1e",
+        background_fill_alpha=0.8,
+        text_align="left",
+        text_baseline="bottom",
+    )
+
+    p.add_layout(x_label, "below")
+    p.add_layout(y_label, "below")
+
+    # CustomJS callback to update labels
+    callback = CustomJS(
+        args={"x_label": x_label, "y_label": y_label, "plot": p},
+        code="""
+        const { x, y } = cb_data['geometry'];
+        const { sx, sy } = cb_data['geometry'];
+        const plotHeight = plot.height;
+        if (sx !== undefined || sy !== undefined) {
+            const date = new Date(x);
+            var hours = date.getUTCHours();
+            var minutes = date.getUTCMinutes();
+            hours = (hours % 12) || 12;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            const xval = hours + ':' + minutes;
+    
+            const yValue = y.toFixed(2);
+    
+            x_label.x =  x;
+            x_label.y = 0;  // Slightly offset from the bottom
+            x_label.text = xval;
+    
+            y_label.x = 0;  // Slightly offset from the left
+            y_label.y = y;
+            y_label.text = yValue;
+    
+            x_label.visible = true;
+            y_label.visible = true;
+        }
+    """,
+    )
+
+    # Add hover tool to update labels
+    # nhover = HoverTool(tooltips=None)
+
+    hover.callback = callback
+
+    # p.add_tools(nhover)
+
+    curdoc().theme = tradingview_theme
+
+    volume_fig = figure(
+        x_axis_type="datetime",
+        title="Volume",
+        min_width=2000,
+        height=250,  # Adjust height as needed
+        background_fill_color="#1e1e1e",
+        x_range=p.x_range,
+    )
+
+    # Bars for volume
+    volume_fig.vbar(
+        x="date_time",
+        width=w,
+        top="volume",
+        fill_color="#26a69a",
+        line_color="black",
+        source=cds,
+        view=green,
+    )
+    volume_fig.vbar(
+        x="date_time",
+        width=w,
+        top="volume",
+        fill_color="#ef5350",
+        line_color="black",
+        source=cds,
+        view=red,
+    )
+
+    volume_fig.xaxis.formatter = CustomJSTickFormatter(
+        code="""
+        var date = new Date(tick);
+        var hours = date.getUTCHours();
+        var minutes = date.getUTCMinutes();
+        var suffix = (hours >= 12) ? 'PM' : 'AM';
+        hours = (hours % 12) || 12;
+        minutes = minutes < 10 ? '0' + minutes : minutes;
+        return hours + ':' + minutes;
+    """
+    )
+
+    volume_fig.xaxis.ticker = DatetimeTicker(desired_num_ticks=30, num_minor_ticks=5)
+
+    volume_fig.yaxis.formatter = NumeralTickFormatter(format="0.0a")
+
+    volume_fig.grid.grid_line_alpha = 0.3
+
+    volume_fig.add_tools(crosshair_tool)
+    volume_fig.add_tools(hover)
+    volume_fig.add_tools(wheel_zoom)
+    volume_fig.toolbar.active_scroll = wheel_zoom
+
+    layout = gridplot([[p], [volume_fig]])
+    show(layout)
+    return layout
