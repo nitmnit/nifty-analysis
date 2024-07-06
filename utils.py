@@ -210,7 +210,7 @@ def build_date_range(date_start, date_end, symbol, interval, exchange):
     return date_range
 
 
-def get_training_dates(start_date, end_date, symbol, interval, exchange):
+def get_date_range(start_date, end_date, symbol, interval, exchange):
     all_dates = pd.DataFrame(
         {
             "trade_date": build_date_range(
@@ -224,7 +224,7 @@ def get_training_dates(start_date, end_date, symbol, interval, exchange):
     test_dates = all_dates_shuffled.iloc[train_size:]
     train_dates = train_dates.sort_values(by="trade_date")
     train_dates.set_index("trade_date", inplace=True)
-    return train_dates
+    return train_dates, test_dates
 
 
 def get_option_chains(dates, ic_symbol):
@@ -744,3 +744,23 @@ def create_candlestick_plot(df):
     layout = gridplot([[p], [volume_fig]])
     show(layout)
     return layout
+
+def get_strike_price_by_price(symbol, expiry, timestamp, option_type, price, exchange):
+    open_price = get_price_at(symbol=symbol, d=timestamp.date(), t=timestamp.time(), interval=INTERVAL_MIN1, exchange=exchange, get_open=False)
+    atm_strike = get_atm_strike(open_price)
+    premium = get_premium_at(symbol=symbol, expiry=expiry, strike_price=atm_strike, date=timestamp.date(), option_type=option_type, tm=timestamp.time(), get_open=False)
+    cur_diff = premium - price
+    increment = 50
+    if (cur_diff > 0) != (option_type == OPTION_TYPE_CALL):
+        increment = -50
+    cur_diff = 1000000
+    prev_diff = cur_diff + 1
+    prev_strike = atm_strike
+    cur_strike = atm_strike + increment
+    while abs(cur_diff) < abs(prev_diff):
+        premium = get_premium_at(symbol=symbol, expiry=expiry, strike_price=cur_strike, date=timestamp.date(), option_type=option_type, tm=timestamp.time(), get_open=False)
+        prev_diff = cur_diff
+        cur_diff = premium - price
+        cur_strike += increment
+    return cur_strike - increment
+
