@@ -503,16 +503,16 @@ class ZerodhaOrderManager(OrderManager):
         pass
 
 
-def create_candlestick_plot(df):
+def create_candlestick_plot(df, title, plot=True, width=2000, height=900):
     cds = ColumnDataSource(df)
     green = CDSView(filter=BooleanFilter(df["close"] >= df["open"]))
     red = CDSView(filter=BooleanFilter(df["close"] < df["open"]))
     w = 60 * 1000
     p = figure(
         x_axis_type="datetime",
-        title=f"Minute Candles",
-        min_width=2000,
-        min_height=900,
+        title=f"{title}",
+        min_width=width,
+        min_height=height,
         background_fill_color="#1e1e1e",
     )
 
@@ -692,7 +692,7 @@ def create_candlestick_plot(df):
     volume_fig = figure(
         x_axis_type="datetime",
         title="Volume",
-        min_width=2000,
+        min_width=width,
         height=250,  # Adjust height as needed
         background_fill_color="#1e1e1e",
         x_range=p.x_range,
@@ -741,26 +741,28 @@ def create_candlestick_plot(df):
     volume_fig.add_tools(wheel_zoom)
     volume_fig.toolbar.active_scroll = wheel_zoom
 
-    layout = gridplot([[p], [volume_fig]])
-    show(layout)
-    return layout
+    if plot:
+        layout = gridplot([[p], [volume_fig]])
+        show(layout)
+    return [[p], [volume_fig]], cds 
 
 def get_strike_price_by_price(symbol, expiry, timestamp, option_type, price, exchange):
     open_price = get_price_at(symbol=symbol, d=timestamp.date(), t=timestamp.time(), interval=INTERVAL_MIN1, exchange=exchange, get_open=False)
     atm_strike = get_atm_strike(open_price)
+    cur_strike = atm_strike
     premium = get_premium_at(symbol=symbol, expiry=expiry, strike_price=atm_strike, date=timestamp.date(), option_type=option_type, tm=timestamp.time(), get_open=False)
     cur_diff = premium - price
+    # print(f"o: {open_price}, atm: {atm_strike}, pr: {premium}, d: {cur_diff}")
     increment = 50
     if (cur_diff > 0) != (option_type == OPTION_TYPE_CALL):
         increment = -50
-    cur_diff = 1000000
-    prev_diff = cur_diff + 1
-    prev_strike = atm_strike
-    cur_strike = atm_strike + increment
-    while abs(cur_diff) < abs(prev_diff):
+    while True:
+        cur_strike = cur_strike + increment
         premium = get_premium_at(symbol=symbol, expiry=expiry, strike_price=cur_strike, date=timestamp.date(), option_type=option_type, tm=timestamp.time(), get_open=False)
         prev_diff = cur_diff
         cur_diff = premium - price
-        cur_strike += increment
+        # print(f"pr: {premium}, prm: {price}, cs: {cur_strike}, diff: {cur_diff}")
+        if abs(cur_diff) > abs(prev_diff):
+            break
     return cur_strike - increment
 

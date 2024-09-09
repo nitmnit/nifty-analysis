@@ -84,7 +84,7 @@ class Order:
     STATUS_INTRADE = "INTRADE"
     STATUS_CLOSED = "CLOSED"
 
-    def __init__(self, type, limit_price, quantity, created_at, exchange_order_id):
+    def __init__(self, type, limit_price, quantity, created_at, exchange_order_id, meta={}):
         self.type = type
         self.limit_price = limit_price
         self.quantity = quantity
@@ -94,6 +94,7 @@ class Order:
         self.created_at = created_at
         self.square_off_at = None
         self.exchange_order_id = exchange_order_id
+        self.meta = meta
         Order.ORDER_ID += 1
 
     def square_off(self, price, square_off_at):
@@ -119,6 +120,7 @@ class Order:
             return
         pc_profit = (self.square_off_price - self.limit_price) * \
             100 / self.limit_price
+        pc_profit = round(pc_profit, 2)
         if self.type == Order.TYPE_BUY:
             return pc_profit
         return -pc_profit
@@ -165,6 +167,18 @@ class OrderManager:
             logger.info(f"squared off {order}")
             self.closed_orders.append(order)
         self.orders = []
+
+    def square_off_order(self, order, last_price, index):
+        idx = -1
+        for i, morder in enumerate(self.orders):
+            if morder.ORDER_ID == order.ORDER_ID:
+                morder.square_off(last_price, index)
+                logger.info(f"squared off {morder}")
+                self.closed_orders.append(morder)
+                idx = i
+                break
+        if idx != -1:
+            del self.orders[idx]
 
 
 class BasePhaseStrategy(Strategy):
